@@ -1,0 +1,26 @@
+/node_modules/
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+/.phpunit.cache
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+/auth.json
+/.vagrant
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+# Legacy Laravel files
+bootstrap/compiled.php
+app/storage/
