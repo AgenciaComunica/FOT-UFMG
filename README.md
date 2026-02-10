@@ -1,43 +1,47 @@
-# TemplateLaravel
+📚 Sistema de Secretaria Acadêmica – Curso de Fisioterapia (Ortopedia e Trauma) | UFMG
 
-Template base para novos projetos Laravel.
+Este projeto consiste no desenvolvimento de um sistema web em Laravel voltado para o gerenciamento acadêmico e administrativo do curso de Fisioterapia – Ortopedia e Trauma da Universidade Federal de Minas Gerais (UFMG).
 
-## Como começar
+A aplicação tem como objetivo centralizar e digitalizar os processos de inscrição e matrícula de alunos, oferecendo uma plataforma segura, organizada e eficiente para alunos, coordenação e equipe administrativa, funcionando como uma secretaria acadêmica digital do curso.
 
-1. Instale as dependências:
+🎯 Objetivos do Sistema
 
-```bash
-composer install
-npm install
-```
+Automatizar o fluxo de inscrições de alunos no curso;
 
-2. Crie o arquivo de ambiente:
+Gerenciar matrículas e status acadêmico dos discentes;
 
-```bash
-cp .env.example .env
-php artisan key:generate
-```
+Centralizar informações acadêmicas de forma estruturada;
 
-3. Configure banco de dados no `.env` e rode as migrations:
+Reduzir processos manuais e retrabalho administrativo;
 
-```bash
-php artisan migrate
-```
+Garantir rastreabilidade, controle e padronização dos dados.
 
-4. Rode o projeto localmente:
+🧩 Funcionalidades Principais
 
-```bash
-composer run dev
-```
+📋 Gestão de inscrições (cadastro, validação, status e prazos);
 
-## Sobre Laravel
+🎓 Gestão de matrículas (confirmação, acompanhamento e histórico);
 
-Laravel é um framework web com sintaxe elegante e ferramentas para acelerar o desenvolvimento.
+👩‍💼 Painel administrativo (secretaria) para controle do curso;
 
-- [Documentação oficial](https://laravel.com/docs)
-- [Laravel Bootcamp](https://bootcamp.laravel.com)
-- [Laracasts](https://laracasts.com)
+🔐 Controle de acesso por perfil (aluno, secretaria, coordenação);
 
-## Licença
+📊 Consulta e organização de dados acadêmicos;
 
-Este projeto está sob licença [MIT](https://opensource.org/licenses/MIT).
+📁 Armazenamento estruturado de documentos relacionados à matrícula.
+
+🛠️ Tecnologias Utilizadas
+
+Laravel (backend e arquitetura MVC)
+
+PHP
+
+Banco de dados relacional (MySQL / PostgreSQL)
+
+Blade / HTML / CSS / JavaScript
+
+Boas práticas de segurança, organização e manutenção de código
+
+📌 Contexto Acadêmico
+
+O sistema foi concebido como um projeto institucional, com foco em confiabilidade, clareza de processos e facilidade de uso, atendendo às necessidades administrativas específicas de um curso da área da saúde.
