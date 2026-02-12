@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      full_deploy:
+        description: "Forcar deploy completo (vendor + build)"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-main
@@ -16,6 +22,25 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed areas
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            composer:
+              - 'composer.json'
+              - 'composer.lock'
+            frontend:
+              - 'package.json'
+              - 'package-lock.json'
+              - 'vite.config.js'
+              - 'tailwind.config.js'
+              - 'postcss.config.js'
+              - 'resources/js/**'
+              - 'resources/css/**'
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -23,19 +48,30 @@ jobs:
           php-version: "8.3"
           tools: composer
 
+      - name: Cache vendor directory
+        id: vendor-cache
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-vendor-${{ hashFiles('composer.lock') }}
+
+      - name: Install PHP dependencies (production)
+        if: steps.changes.outputs.composer == 'true' || steps.vendor-cache.outputs.cache-hit != 'true' || github.event.inputs.full_deploy == 'true'
+        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+
       - name: Setup Node
+        if: steps.changes.outputs.frontend == 'true' || github.event.inputs.full_deploy == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
-      - name: Install PHP dependencies (production)
-        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
-
       - name: Install frontend dependencies
+        if: steps.changes.outputs.frontend == 'true' || github.event.inputs.full_deploy == 'true'
         run: npm ci
 
       - name: Build frontend assets
+        if: steps.changes.outputs.frontend == 'true' || github.event.inputs.full_deploy == 'true'
         run: npm run build
 
       - name: Prepare deploy package
@@ -48,6 +84,8 @@ jobs:
             --exclude "tests" \
             --exclude ".env" \
             --exclude ".env.*" \
+            --exclude "vendor" \
+            --exclude "public/build" \
             --exclude "storage/logs/*" \
             --exclude "storage/framework/cache/*" \
             --exclude "storage/framework/sessions/*" \
@@ -55,7 +93,17 @@ jobs:
             --exclude ".phpunit.result.cache" \
             --exclude "phpunit.xml" \
             ./ .deploy/secretaria/
-          rsync -av --delete ./public/ .deploy/app/
+
+          rsync -av --delete --exclude "build" ./public/ .deploy/app/
+
+          if [ "${{ steps.changes.outputs.composer }}" = "true" ] || [ "${{ steps.vendor-cache.outputs.cache-hit }}" != "true" ] || [ "${{ github.event.inputs.full_deploy }}" = "true" ]; then
+            rsync -av ./vendor/ .deploy/secretaria/vendor/
+          fi
+
+          if [ "${{ steps.changes.outputs.frontend }}" = "true" ] || [ "${{ github.event.inputs.full_deploy }}" = "true" ]; then
+            rsync -av ./public/build/ .deploy/secretaria/public/build/
+            rsync -av ./public/build/ .deploy/app/build/
+          fi
 
       - name: Upload project to ~/secretaria
         uses: locaweb/ftp-deploy@1.0.0
