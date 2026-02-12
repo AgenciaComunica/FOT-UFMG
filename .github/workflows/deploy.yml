@@ -38,39 +38,41 @@ jobs:
       - name: Build frontend assets
         run: npm run build
 
+      - name: Prepare deploy package
+        run: |
+          mkdir -p .deploy/secretaria .deploy/app
+          rsync -av --delete \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude "node_modules" \
+            --exclude "tests" \
+            --exclude ".env" \
+            --exclude ".env.*" \
+            --exclude "storage/logs/*" \
+            --exclude "storage/framework/cache/*" \
+            --exclude "storage/framework/sessions/*" \
+            --exclude "storage/framework/views/*" \
+            --exclude ".phpunit.result.cache" \
+            --exclude "phpunit.xml" \
+            ./ .deploy/secretaria/
+          rsync -av --delete ./public/ .deploy/app/
+
       - name: Upload project to ~/secretaria
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: locaweb/ftp-deploy@1.0.0
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
+          host: ${{ secrets.FTP_SERVER }}
+          user: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ${{ secrets.FTP_PROTOCOL }}
-          port: ${{ secrets.FTP_PORT }}
-          local-dir: ./
-          server-dir: secretaria/
-          exclude: |
-            **/.git*
-            **/.github/**
-            **/node_modules/**
-            **/tests/**
-            **/.env
-            **/.env.*
-            **/storage/logs/**
-            **/storage/framework/cache/**
-            **/storage/framework/sessions/**
-            **/storage/framework/views/**
-            **/.phpunit.result.cache
-            **/phpunit.xml
-          state-name: .ftp-state-secretaria.json
+          localDir: .deploy/secretaria
+          remoteDir: secretaria
+          forceSsl: false
 
       - name: Upload public entrypoint to ~/public_html/app
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: locaweb/ftp-deploy@1.0.0
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
+          host: ${{ secrets.FTP_SERVER }}
+          user: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ${{ secrets.FTP_PROTOCOL }}
-          port: ${{ secrets.FTP_PORT }}
-          local-dir: ./public/
-          server-dir: public_html/app/
-          state-name: .ftp-state-app.json
+          localDir: .deploy/app
+          remoteDir: public_html/app
+          forceSsl: false
