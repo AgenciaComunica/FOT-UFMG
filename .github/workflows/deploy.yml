@@ -1,34 +1,78 @@
-name: CI
+name: Deploy Locaweb
 
-# on:
-#   push:
-#     branches: [main, dev]
-#   pull_request:
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
-# Workflow desativado temporariamente.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
 
 jobs:
-  tests:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: "8.3"
           tools: composer
 
-      - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
 
-      - name: Copy .env
-        run: cp .env.example .env
+      - name: Install PHP dependencies (production)
+        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
-      - name: Generate key
-        run: php artisan key:generate
+      - name: Install frontend dependencies
+        run: npm ci
 
-      - name: Run tests
-        run: php artisan test
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Prepare deploy package
+        run: |
+          mkdir -p .deploy/secretaria .deploy/app
+          rsync -av --delete \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude "node_modules" \
+            --exclude "tests" \
+            --exclude ".env" \
+            --exclude ".env.*" \
+            --exclude "storage/logs/*" \
+            --exclude "storage/framework/cache/*" \
+            --exclude "storage/framework/sessions/*" \
+            --exclude "storage/framework/views/*" \
+            --exclude ".phpunit.result.cache" \
+            --exclude "phpunit.xml" \
+            ./ .deploy/secretaria/
+          rsync -av --delete ./public/ .deploy/app/
+
+      - name: Upload project to ~/secretaria
+        uses: locaweb/ftp-deploy@1.0.0
+        with:
+          host: ${{ secrets.FTP_SERVER }}
+          user: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          localDir: .deploy/secretaria
+          remoteDir: secretaria
+          forceSsl: false
+
+      - name: Upload public entrypoint to ~/public_html/app
+        uses: locaweb/ftp-deploy@1.0.0
+        with:
+          host: ${{ secrets.FTP_SERVER }}
+          user: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          localDir: .deploy/app
+          remoteDir: public_html/app
+          forceSsl: false
