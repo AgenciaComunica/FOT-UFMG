@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Inscricao;
+use App\Models\InscricaoDocumento;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -13,11 +13,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call([SecretariaUserSeeder::class]);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        $inscricao = Inscricao::factory()->create();
+
+        foreach (InscricaoDocumento::TIPOS as $tipo) {
+            InscricaoDocumento::factory()->create([
+                'inscricao_id' => $inscricao->id,
+                'tipo' => $tipo,
+                'arquivo_path' => 'inscricoes/'.$inscricao->id.'/'.$tipo.'.pdf',
+                'original_name' => strtolower($tipo).'.pdf',
+            ]);
+        }
     }
 }
