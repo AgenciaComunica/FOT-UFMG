@@ -1,47 +1,98 @@
-📚 Sistema de Secretaria Acadêmica – Curso de Fisioterapia (Ortopedia e Trauma) | UFMG
+# Sistema de Secretaria - FOT/UFMG
 
-Este projeto consiste no desenvolvimento de um sistema web em Laravel voltado para o gerenciamento acadêmico e administrativo do curso de Fisioterapia – Ortopedia e Trauma da Universidade Federal de Minas Gerais (UFMG).
+MVP em Laravel para o processo de inscrição e homologação:
 
-A aplicação tem como objetivo centralizar e digitalizar os processos de inscrição e matrícula de alunos, oferecendo uma plataforma segura, organizada e eficiente para alunos, coordenação e equipe administrativa, funcionando como uma secretaria acadêmica digital do curso.
+- Inscrição pública por edital (sem login)
+- Homologação/indeferimento pela secretaria (admin)
+- Liberação de acesso do aluno somente após homologação
+- Download privado de documentos PDF
+- Relatórios CSV por edital
 
-🎯 Objetivos do Sistema
+## Requisitos
 
-Automatizar o fluxo de inscrições de alunos no curso;
+- PHP 8.2+
+- Composer
+- Node.js 18+
+- MySQL/MariaDB (produção) ou SQLite (testes)
 
-Gerenciar matrículas e status acadêmico dos discentes;
+## Setup
 
-Centralizar informações acadêmicas de forma estruturada;
+```bash
+cp .env.example .env
+composer install
+php artisan key:generate
+npm install
+npm run build
+php artisan migrate --seed
+php artisan storage:link
+```
 
-Reduzir processos manuais e retrabalho administrativo;
+Usuário seed:
 
-Garantir rastreabilidade, controle e padronização dos dados.
+- `admin@teste.com`
+- senha: `12345678`
 
-🧩 Funcionalidades Principais
+## Fluxo completo (manual)
 
-📋 Gestão de inscrições (cadastro, validação, status e prazos);
+1. Acesse `/` e clique em inscrição no edital aberto.
+2. Envie inscrição pública com documentos PDF.
+3. Faça login como admin e acesse `/admin/editais`.
+4. Entre nas inscrições do edital e abra o detalhe.
+5. Homologue ou indefira:
+   - Homologar exige todos os documentos obrigatórios.
+   - Indeferir exige motivo.
+6. Após homologar:
+   - o sistema cria/vincula usuário `role=aluno`.
+   - tenta enviar link de reset de senha.
+   - sem SMTP, gera senha temporária e mostra uma vez na tela do admin.
+7. Aluno faz login e acessa `/aluno/painel`.
+8. Admin exporta CSV:
+   - `/admin/editais/{edital}/relatorios/inscricoes-recebidas.csv`
+   - `/admin/editais/{edital}/relatorios/inscricoes-homologadas.csv`
 
-🎓 Gestão de matrículas (confirmação, acompanhamento e histórico);
+## Mail (SMTP) e fallback
 
-👩‍💼 Painel administrativo (secretaria) para controle do curso;
+Configurar `.env` para envio real de reset de senha:
 
-🔐 Controle de acesso por perfil (aluno, secretaria, coordenação);
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=...
+MAIL_PORT=587
+MAIL_USERNAME=...
+MAIL_PASSWORD=...
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=...
+MAIL_FROM_NAME="FOT-UFMG"
+```
 
-📊 Consulta e organização de dados acadêmicos;
+Se `MAIL_MAILER=log` (ou reset falhar), o sistema usa fallback com senha temporária exibida apenas no retorno da homologação.
 
-📁 Armazenamento estruturado de documentos relacionados à matrícula.
+## Testes
 
-🛠️ Tecnologias Utilizadas
+```bash
+php artisan test
+```
 
-Laravel (backend e arquitetura MVC)
+## Rotas principais
 
-PHP
+Público:
 
-Banco de dados relacional (MySQL / PostgreSQL)
+- `GET /editais/{edital}/inscricao`
+- `POST /editais/{edital}/inscricao`
+- `GET /editais/{edital}/inscricao/confirmacao/{protocolo}`
 
-Blade / HTML / CSS / JavaScript
+Admin:
 
-Boas práticas de segurança, organização e manutenção de código
+- `GET /admin/editais`
+- `GET /admin/editais/{edital}/inscricoes`
+- `GET /admin/inscricoes/{id}`
+- `POST /admin/inscricoes/{id}/homologar`
+- `POST /admin/inscricoes/{id}/indeferir`
+- `GET /admin/inscricoes/{inscricao}/documentos/{doc}/download`
 
-📌 Contexto Acadêmico
+Aluno:
 
-O sistema foi concebido como um projeto institucional, com foco em confiabilidade, clareza de processos e facilidade de uso, atendendo às necessidades administrativas específicas de um curso da área da saúde.
+- `GET /aluno/painel`
+- `GET /aluno/inscricoes`
+- `GET /aluno/inscricoes/{id}`
+- `GET /aluno/documentos/{doc}/download`

@@ -2,27 +2,30 @@
 
 namespace Database\Seeders;
 
-use App\Models\Inscricao;
+use App\Models\Edital;
 use App\Models\InscricaoDocumento;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
         $this->call([SecretariaUserSeeder::class]);
 
-        $inscricao = Inscricao::factory()->create();
+        $edital = Edital::query()->create([
+            'titulo' => 'Edital FOT/UFMG - Turma Atual',
+            'descricao' => 'Processo seletivo do curso de Fisioterapia - Ortopedia e Trauma.',
+            'periodo_inscricao_inicio' => now()->subDay(),
+            'periodo_inscricao_fim' => now()->addDays(15)->setTime(23, 59),
+        ]);
 
+        $ordem = 1;
         foreach (InscricaoDocumento::TIPOS as $tipo) {
-            InscricaoDocumento::factory()->create([
-                'inscricao_id' => $inscricao->id,
+            $edital->documentosRequeridos()->create([
                 'tipo' => $tipo,
-                'arquivo_path' => 'inscricoes/'.$inscricao->id.'/'.$tipo.'.pdf',
-                'original_name' => strtolower($tipo).'.pdf',
+                'descricao' => 'Enviar arquivo PDF legível.',
+                'obrigatorio' => $tipo !== InscricaoDocumento::HISTORICO_ESCOLAR,
+                'ordem' => $ordem++,
             ]);
         }
     }

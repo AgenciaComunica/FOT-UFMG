@@ -45,7 +45,7 @@
 
         <p class="mt-8 text-center text-xs text-slate-500">
             Não tem login ainda?
-            <a href="{{ route('inscricao.create') }}" class="font-semibold text-sky-700 hover:text-sky-600">
+            <a href="{{ route('home') }}" class="font-semibold text-sky-700 hover:text-sky-600">
                 Faça sua inscrição
             </a>
         </p>

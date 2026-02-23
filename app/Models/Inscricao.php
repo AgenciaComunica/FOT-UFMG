@@ -14,10 +14,11 @@ class Inscricao extends Model
     protected $table = 'inscricoes';
 
     public const STATUS_RECEBIDA = 'RECEBIDA';
-    public const STATUS_APROVADA = 'APROVADA';
-    public const STATUS_REJEITADA = 'REJEITADA';
+    public const STATUS_HOMOLOGADA = 'HOMOLOGADA';
+    public const STATUS_INDEFERIDA = 'INDEFERIDA';
 
     protected $fillable = [
+        'edital_id',
         'user_id',
         'protocolo',
         'nome_completo',
@@ -28,7 +29,7 @@ class Inscricao extends Model
         'submitted_at',
         'decided_at',
         'decided_by',
-        'rejection_reason',
+        'indeferimento_motivo',
     ];
 
     protected function casts(): array
@@ -37,6 +38,11 @@ class Inscricao extends Model
             'submitted_at' => 'datetime',
             'decided_at' => 'datetime',
         ];
+    }
+
+    public function edital(): BelongsTo
+    {
+        return $this->belongsTo(Edital::class);
     }
 
     public function documentos(): HasMany
@@ -52,5 +58,30 @@ class Inscricao extends Model
     public function decidedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'decided_by');
+    }
+
+    public function possuiDocumentosObrigatorios(): bool
+    {
+        if (! $this->relationLoaded('edital')) {
+            $this->load('edital.documentosRequeridos');
+        }
+
+        if (! $this->relationLoaded('documentos')) {
+            $this->load('documentos');
+        }
+
+        if (! $this->edital) {
+            return false;
+        }
+
+        $enviados = $this->documentos->pluck('tipo')->unique();
+
+        foreach ($this->edital->documentosRequeridos->where('obrigatorio', true) as $requerido) {
+            if (! $enviados->contains($requerido->tipo)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
