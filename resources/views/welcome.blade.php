@@ -69,9 +69,11 @@
                         <p class="text-xs font-semibold uppercase tracking-wide text-white/90">Login</p>
                         <h2 class="mt-2 text-xl font-semibold text-white">Acessar a Plataforma</h2>
                         <p class="mt-2 text-sm text-white/90">Acompanhe inscrições, homologações e documentos.</p>
-                        <a href="{{ route('login') }}" class="mt-4 inline-flex self-center items-center rounded-md border border-white bg-transparent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-white/10">
-                            Acessar
-                        </a>
+                        <div class="mt-4 flex justify-center">
+                            <a href="{{ route('login') }}" class="inline-flex items-center rounded-md border border-white bg-transparent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-white/10">
+                                Acessar
+                            </a>
+                        </div>
                     </div>
                 </div>
             </section>
