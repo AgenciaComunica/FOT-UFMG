@@ -71,3 +71,33 @@
         @apply mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
     }
 }
+
+@keyframes float-slow {
+    0%, 100% { transform: translateY(0) translateX(0); }
+    50% { transform: translateY(-14px) translateX(8px); }
+}
+
+@keyframes float-reverse {
+    0%, 100% { transform: translateY(0) translateX(0); }
+    50% { transform: translateY(10px) translateX(-10px); }
+}
+
+@keyframes drift {
+    0% { transform: translateX(-2%); }
+    50% { transform: translateX(2%); }
+    100% { transform: translateX(-2%); }
+}
+
+@layer utilities {
+    .anim-float-slow {
+        animation: float-slow 8s ease-in-out infinite;
+    }
+
+    .anim-float-reverse {
+        animation: float-reverse 10s ease-in-out infinite;
+    }
+
+    .anim-drift {
+        animation: drift 14s ease-in-out infinite;
+    }
+}
