@@ -7,12 +7,14 @@ use App\Http\Requests\AdminHomologarInscricaoRequest;
 use App\Http\Requests\AdminIndeferirInscricaoRequest;
 use App\Models\Edital;
 use App\Models\Inscricao;
+use App\Models\InscricaoAvaliacao;
 use App\Models\InscricaoDocumento;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -144,13 +146,157 @@ class InscricaoController extends Controller
     {
         $this->authorize('view', $inscricao);
 
-        $inscricao->load(['edital.documentosRequeridos', 'documentos', 'user', 'decidedByUser']);
+        $inscricao->load([
+            'edital.documentosRequeridos',
+            'edital.docentesBanca',
+            'documentos',
+            'user',
+            'decidedByUser',
+            'avaliacoes.docente',
+        ]);
+
+        $avaliacoesByDocente = $inscricao->avaliacoes->keyBy('docente_id');
+        $avaliacoesPainel = $inscricao->edital->docentesBanca
+            ->map(function (User $docente) use ($avaliacoesByDocente) {
+                /** @var InscricaoAvaliacao|null $avaliacao */
+                $avaliacao = $avaliacoesByDocente->get($docente->id);
+
+                return [
+                    'docente' => $docente,
+                    'status' => $avaliacao && $avaliacao->nota !== null ? 'AVALIADO' : 'PENDENTE',
+                    'nota' => $avaliacao?->nota,
+                    'comentario' => $avaliacao?->comentario,
+                    'avaliado_at' => $avaliacao?->avaliado_at,
+                ];
+            })
+            ->values();
+
+        $mediaAvaliacoes = $inscricao->avaliacoes()
+            ->whereNotNull('nota')
+            ->avg('nota');
 
         return view('admin.inscricoes.show', [
             'inscricao' => $inscricao,
+            'avaliacoesPainel' => $avaliacoesPainel,
+            'mediaAvaliacoes' => $mediaAvaliacoes !== null ? number_format((float) $mediaAvaliacoes, 2, ',', '.') : null,
             'podeHomologar' => $inscricao->status === Inscricao::STATUS_RECEBIDA
                 && $inscricao->possuiDocumentosObrigatorios(),
         ]);
+    }
+
+    public function salvarAvaliacao(Request $request, Inscricao $inscricao): RedirectResponse
+    {
+        $this->authorize('view', $inscricao);
+
+        $data = $request->validate([
+            'docente_id' => ['required', 'integer', 'exists:users,id'],
+            'nota' => ['required', 'numeric', 'min:0', 'max:10'],
+            'comentario' => ['nullable', 'string', 'max:2000'],
+            'confirm_code_expected' => ['required', 'digits:2'],
+            'confirm_code_input' => ['required', 'digits:2'],
+        ], [
+            'nota.required' => 'Informe a nota da avaliação.',
+            'nota.numeric' => 'A nota deve ser numérica.',
+            'nota.min' => 'A nota mínima é 0.',
+            'nota.max' => 'A nota máxima é 10.',
+            'confirm_code_input.required' => 'Informe o código de confirmação.',
+            'confirm_code_input.digits' => 'O código de confirmação deve ter 2 dígitos.',
+        ]);
+
+        $this->assertDocenteNaBanca($inscricao, (int) $data['docente_id']);
+        $this->assertConfirmCode($data['confirm_code_expected'], $data['confirm_code_input']);
+
+        InscricaoAvaliacao::query()->updateOrCreate(
+            [
+                'inscricao_id' => $inscricao->id,
+                'docente_id' => (int) $data['docente_id'],
+            ],
+            [
+                'nota' => (float) $data['nota'],
+                'comentario' => filled($data['comentario'] ?? null) ? trim((string) $data['comentario']) : null,
+                'avaliado_at' => now(),
+            ]
+        );
+
+        return redirect()
+            ->route('admin.inscricoes.show', $inscricao)
+            ->with('status', 'Avaliação atualizada com sucesso.');
+    }
+
+    public function limparAvaliacao(Request $request, Inscricao $inscricao): RedirectResponse
+    {
+        $this->authorize('view', $inscricao);
+
+        $data = $request->validate([
+            'docente_id' => ['required', 'integer', 'exists:users,id'],
+            'confirm_code_expected' => ['required', 'digits:2'],
+            'confirm_code_input' => ['required', 'digits:2'],
+        ], [
+            'confirm_code_input.required' => 'Informe o código de confirmação.',
+            'confirm_code_input.digits' => 'O código de confirmação deve ter 2 dígitos.',
+        ]);
+
+        $this->assertDocenteNaBanca($inscricao, (int) $data['docente_id']);
+        $this->assertConfirmCode($data['confirm_code_expected'], $data['confirm_code_input']);
+
+        InscricaoAvaliacao::query()
+            ->where('inscricao_id', $inscricao->id)
+            ->where('docente_id', (int) $data['docente_id'])
+            ->delete();
+
+        return redirect()
+            ->route('admin.inscricoes.show', $inscricao)
+            ->with('status', 'Avaliação limpa com sucesso.');
+    }
+
+    public function enviarLembreteAvaliacao(Inscricao $inscricao, User $docente): RedirectResponse
+    {
+        $this->authorize('view', $inscricao);
+        $this->assertDocenteNaBanca($inscricao, $docente->id);
+
+        $avaliacao = InscricaoAvaliacao::query()
+            ->where('inscricao_id', $inscricao->id)
+            ->where('docente_id', $docente->id)
+            ->first();
+
+        if ($avaliacao && $avaliacao->nota !== null) {
+            throw ValidationException::withMessages([
+                'avaliacao' => 'Lembrete disponível apenas para avaliações pendentes.',
+            ]);
+        }
+
+        Mail::raw(
+            "Olá {$docente->name},\n\nA inscrição {$inscricao->protocolo} do edital {$inscricao->edital?->titulo} ainda está pendente de avaliação.\n\nPor favor, acesse a plataforma para registrar sua avaliação.",
+            function ($message) use ($docente): void {
+                $message->to($docente->email)->subject('Lembrete de avaliação pendente');
+            }
+        );
+
+        return redirect()
+            ->route('admin.inscricoes.show', $inscricao)
+            ->with('status', 'Lembrete enviado ao docente com sucesso.');
+    }
+
+    private function assertDocenteNaBanca(Inscricao $inscricao, int $docenteId): void
+    {
+        $isBanca = $inscricao->edital()
+            ->whereHas('docentesBanca', fn ($q) => $q->where('users.id', $docenteId))
+            ->exists();
+
+        if (! $isBanca) {
+            throw ValidationException::withMessages([
+                'docente_id' => 'Docente não pertence à banca deste edital.',
+            ]);
+        }
+    }
+
+    private function assertConfirmCode(string $expected, string $input): void
+    {
+        if (trim($expected) !== trim($input)) {
+            throw ValidationException::withMessages([
+                'confirm_code_input' => 'Código de confirmação inválido.',
+            ]);
+        }
     }
 
     public function homologar(AdminHomologarInscricaoRequest $request, Inscricao $inscricao): RedirectResponse

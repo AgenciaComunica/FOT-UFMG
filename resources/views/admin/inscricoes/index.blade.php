@@ -21,9 +21,9 @@
                 <x-input-label for="status" value="Status" />
                 <select id="status" name="status" class="input-base">
                     <option value="">Todos</option>
-                    <option value="RECEBIDA" @selected($status === 'RECEBIDA')>RECEBIDA</option>
-                    <option value="HOMOLOGADA" @selected($status === 'HOMOLOGADA')>HOMOLOGADA</option>
-                    <option value="INDEFERIDA" @selected($status === 'INDEFERIDA')>INDEFERIDA</option>
+                    <option value="RECEBIDA" @selected($status === 'RECEBIDA')>Em Análise</option>
+                    <option value="HOMOLOGADA" @selected($status === 'HOMOLOGADA')>Homologada</option>
+                    <option value="INDEFERIDA" @selected($status === 'INDEFERIDA')>Indeferida</option>
                 </select>
             </div>
             <div>
@@ -59,12 +59,17 @@
                                 'INDEFERIDA' => 'status-indeferida',
                                 default => 'status-recebida',
                             };
+                            $statusLabel = match($inscricao->status) {
+                                'HOMOLOGADA' => 'Homologada',
+                                'INDEFERIDA' => 'Indeferida',
+                                default => 'Em Análise',
+                            };
                         @endphp
                         <tr>
                             <td class="font-semibold text-slate-700">{{ $inscricao->protocolo }}</td>
                             <td>{{ $inscricao->nome_completo }}</td>
                             <td>{{ $inscricao->email }}</td>
-                            <td><span class="status-badge {{ $statusClass }}">{{ $inscricao->status }}</span></td>
+                            <td><span class="status-badge {{ $statusClass }}">{{ $statusLabel }}</span></td>
                             <td>{{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</td>
                             <td>
                                 <a href="{{ route('admin.inscricoes.show', $inscricao) }}" class="text-blue-600 hover:underline">Ver detalhe</a>

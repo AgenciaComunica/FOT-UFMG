@@ -222,7 +222,7 @@ class EditalController extends Controller
             'graficoTempoLabels' => $serieTempoLabels,
             'graficoTempoData' => $serieTempoData,
             'graficoGranularidade' => $graficoGranularidade,
-            'graficoStatusLabels' => ['Homologado', 'Não Homologado', 'Aguardando Homologação'],
+            'graficoStatusLabels' => ['Homologada', 'Indeferida', 'Em análise'],
             'graficoStatusData' => [
                 (int) ($statusCountMap['HOMOLOGADA'] ?? 0),
                 (int) ($statusCountMap['INDEFERIDA'] ?? 0),

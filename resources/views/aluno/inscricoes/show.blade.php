@@ -13,10 +13,15 @@
                 'INDEFERIDA' => 'status-indeferida',
                 default => 'status-recebida',
             };
+            $statusLabel = match($inscricao->status) {
+                'HOMOLOGADA' => 'Homologada',
+                'INDEFERIDA' => 'Indeferida',
+                default => 'Em Análise',
+            };
         @endphp
 
         <div class="panel-card space-y-2 text-sm text-slate-700">
-            <p><strong>Status:</strong> <span class="status-badge {{ $statusClass }}">{{ $inscricao->status }}</span></p>
+            <p><strong>Status:</strong> <span class="status-badge {{ $statusClass }}">{{ $statusLabel }}</span></p>
             <p><strong>Nome:</strong> {{ $inscricao->nome_completo }}</p>
             <p><strong>Email:</strong> {{ $inscricao->email }}</p>
             <p><strong>Protocolo:</strong> {{ $inscricao->protocolo }}</p>

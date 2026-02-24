@@ -60,6 +60,11 @@ class Inscricao extends Model
         return $this->belongsTo(User::class, 'decided_by');
     }
 
+    public function avaliacoes(): HasMany
+    {
+        return $this->hasMany(InscricaoAvaliacao::class);
+    }
+
     public function possuiDocumentosObrigatorios(): bool
     {
         if (! $this->relationLoaded('edital')) {

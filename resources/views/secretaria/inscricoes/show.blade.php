@@ -20,11 +20,14 @@
             @endif
 
             <div class="bg-white shadow sm:rounded-lg p-6 space-y-2 text-sm">
+                @php
+                    $statusLabel = $inscricao->status === 'RECEBIDA' ? 'Em Análise' : $inscricao->status;
+                @endphp
                 <p><strong>Nome:</strong> {{ $inscricao->nome_completo }}</p>
                 <p><strong>Email:</strong> {{ $inscricao->email }}</p>
                 <p><strong>CPF:</strong> {{ $inscricao->cpf }}</p>
                 <p><strong>Telefone:</strong> {{ $inscricao->telefone ?: '-' }}</p>
-                <p><strong>Status:</strong> {{ $inscricao->status }}</p>
+                <p><strong>Status:</strong> {{ $statusLabel }}</p>
                 <p><strong>Protocolo:</strong> {{ $inscricao->protocolo }}</p>
                 <p><strong>Enviado em:</strong> {{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</p>
                 <p><strong>Decidido em:</strong> {{ optional($inscricao->decided_at)->format('d/m/Y H:i') ?: '-' }}</p>

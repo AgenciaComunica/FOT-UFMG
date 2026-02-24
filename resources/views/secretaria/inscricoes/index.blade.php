@@ -10,7 +10,7 @@
                     <x-input-label for="status" value="Status" />
                     <select id="status" name="status" class="mt-1 rounded-md border-gray-300 shadow-sm">
                         <option value="">Todos</option>
-                        <option value="RECEBIDA" @selected($status === 'RECEBIDA')>RECEBIDA</option>
+                        <option value="RECEBIDA" @selected($status === 'RECEBIDA')>Em Análise</option>
                         <option value="APROVADA" @selected($status === 'APROVADA')>APROVADA</option>
                         <option value="REJEITADA" @selected($status === 'REJEITADA')>REJEITADA</option>
                     </select>
@@ -39,10 +39,13 @@
                     <tbody>
                         @forelse ($inscricoes as $inscricao)
                             <tr class="border-b">
+                                @php
+                                    $statusLabel = $inscricao->status === 'RECEBIDA' ? 'Em Análise' : $inscricao->status;
+                                @endphp
                                 <td class="py-2 pr-4">{{ $inscricao->id }}</td>
                                 <td class="py-2 pr-4">{{ $inscricao->nome_completo }}</td>
                                 <td class="py-2 pr-4">{{ $inscricao->email }}</td>
-                                <td class="py-2 pr-4">{{ $inscricao->status }}</td>
+                                <td class="py-2 pr-4">{{ $statusLabel }}</td>
                                 <td class="py-2 pr-4">{{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</td>
                                 <td class="py-2">
                                     <a href="{{ route('secretaria.inscricoes.show', $inscricao) }}" class="text-indigo-600 hover:underline">Ver detalhe</a>

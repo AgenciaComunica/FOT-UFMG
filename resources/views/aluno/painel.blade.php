@@ -15,10 +15,15 @@
                         'INDEFERIDA' => 'status-indeferida',
                         default => 'status-recebida',
                     };
+                    $statusLabel = match($ultimaInscricao->status) {
+                        'HOMOLOGADA' => 'Homologada',
+                        'INDEFERIDA' => 'Indeferida',
+                        default => 'Em Análise',
+                    };
                 @endphp
                 <p class="text-sm text-slate-600"><strong>Edital:</strong> {{ $ultimaInscricao->edital?->titulo }}</p>
                 <p class="mt-1 text-sm text-slate-600"><strong>Protocolo:</strong> {{ $ultimaInscricao->protocolo }}</p>
-                <p class="mt-2"><span class="status-badge {{ $statusClass }}">{{ $ultimaInscricao->status }}</span></p>
+                <p class="mt-2"><span class="status-badge {{ $statusClass }}">{{ $statusLabel }}</span></p>
             @else
                 <p class="text-sm text-slate-600">Nenhuma inscrição vinculada ao seu usuário.</p>
             @endif

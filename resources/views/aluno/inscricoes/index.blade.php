@@ -26,11 +26,16 @@
                                 'INDEFERIDA' => 'status-indeferida',
                                 default => 'status-recebida',
                             };
+                            $statusLabel = match($inscricao->status) {
+                                'HOMOLOGADA' => 'Homologada',
+                                'INDEFERIDA' => 'Indeferida',
+                                default => 'Em Análise',
+                            };
                         @endphp
                         <tr>
                             <td class="font-semibold text-slate-700">{{ $inscricao->protocolo }}</td>
                             <td>{{ $inscricao->edital?->titulo }}</td>
-                            <td><span class="status-badge {{ $statusClass }}">{{ $inscricao->status }}</span></td>
+                            <td><span class="status-badge {{ $statusClass }}">{{ $statusLabel }}</span></td>
                             <td>{{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</td>
                             <td><a href="{{ route('aluno.inscricoes.show', $inscricao) }}" class="text-blue-600 hover:underline">Detalhes</a></td>
                         </tr>

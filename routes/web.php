@@ -58,6 +58,9 @@ Route::prefix('admin')
         Route::get('/inscricoes/{inscricao}', [AdminInscricaoController::class, 'show'])->name('inscricoes.show');
         Route::post('/inscricoes/{inscricao}/homologar', [AdminInscricaoController::class, 'homologar'])->name('inscricoes.homologar');
         Route::post('/inscricoes/{inscricao}/indeferir', [AdminInscricaoController::class, 'indeferir'])->name('inscricoes.indeferir');
+        Route::post('/inscricoes/{inscricao}/avaliacoes/salvar', [AdminInscricaoController::class, 'salvarAvaliacao'])->name('inscricoes.avaliacoes.salvar');
+        Route::post('/inscricoes/{inscricao}/avaliacoes/limpar', [AdminInscricaoController::class, 'limparAvaliacao'])->name('inscricoes.avaliacoes.limpar');
+        Route::post('/inscricoes/{inscricao}/avaliacoes/{docente}/lembrete', [AdminInscricaoController::class, 'enviarLembreteAvaliacao'])->name('inscricoes.avaliacoes.lembrete');
         Route::get('/inscricoes/{inscricao}/documentos/{doc}/download', [AdminInscricaoController::class, 'downloadDocumento'])
             ->name('inscricoes.documentos.download');
 
