@@ -8,6 +8,7 @@
 
     <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ showFilters: true }">
         <form method="GET" x-show="showFilters" x-transition class="panel-card grid gap-3 md:grid-cols-5 md:items-end">
+            <input type="hidden" name="per_page" value="{{ $perPage }}">
             <div>
                 <x-input-label for="edital_id" value="Edital" />
                 <select id="edital_id" name="edital_id" class="input-base">
@@ -80,6 +81,39 @@
             </table>
         </div>
 
-        <div>{{ $inscricoes->links() }}</div>
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <form method="GET" class="flex items-center gap-2">
+                <input type="hidden" name="edital_id" value="{{ $editalId }}">
+                <input type="hidden" name="status" value="{{ $status }}">
+                <input type="hidden" name="data" value="{{ $date }}">
+                <input type="hidden" name="q" value="{{ $search }}">
+                <label for="per_page_bottom" class="text-sm text-slate-600">Itens por página</label>
+                <select id="per_page_bottom" name="per_page" class="rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
+                    @foreach ($perPageOptions as $option)
+                        <option value="{{ $option }}" @selected((string) $perPage === (string) $option)>
+                            {{ $option === 'all' ? 'Todos' : $option }}
+                        </option>
+                    @endforeach
+                </select>
+            </form>
+
+            <div class="flex items-center gap-2">
+                @if ($inscricoes->previousPageUrl())
+                    <a href="{{ $inscricoes->previousPageUrl() }}" class="btn-muted">Anterior</a>
+                @else
+                    <span class="btn-muted cursor-not-allowed opacity-50">Anterior</span>
+                @endif
+
+                <span class="text-sm text-slate-600">
+                    Página {{ $inscricoes->currentPage() }} de {{ max(1, $inscricoes->lastPage()) }}
+                </span>
+
+                @if ($inscricoes->nextPageUrl())
+                    <a href="{{ $inscricoes->nextPageUrl() }}" class="btn-muted">Próximo</a>
+                @else
+                    <span class="btn-muted cursor-not-allowed opacity-50">Próximo</span>
+                @endif
+            </div>
+        </div>
     </div>
 </x-app-layout>

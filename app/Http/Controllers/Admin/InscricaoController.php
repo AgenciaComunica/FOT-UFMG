@@ -27,8 +27,13 @@ class InscricaoController extends Controller
         $search = $request->string('q')->value();
         $date = $request->string('data')->value();
         $editalId = (int) $request->integer('edital_id', 0);
+        $perPageRaw = trim((string) $request->string('per_page', '30')->value());
+        $perPageOptions = ['30', '50', '100', 'all'];
+        if (! in_array($perPageRaw, $perPageOptions, true)) {
+            $perPageRaw = '30';
+        }
 
-        $inscricoes = Inscricao::query()
+        $query = Inscricao::query()
             ->with('edital')
             ->when($editalId > 0, fn ($query) => $query->where('edital_id', $editalId))
             ->when($status, fn ($query) => $query->where('status', $status))
@@ -42,8 +47,14 @@ class InscricaoController extends Controller
                         ->orWhere('cpf', 'like', '%'.$search.'%');
                 });
             })
-            ->latest('submitted_at')
-            ->paginate(20)
+            ->latest('submitted_at');
+
+        $perPage = $perPageRaw === 'all'
+            ? max(1, (clone $query)->count())
+            : (int) $perPageRaw;
+
+        $inscricoes = $query
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('admin.inscricoes.global', [
@@ -52,6 +63,8 @@ class InscricaoController extends Controller
             'search' => $search,
             'date' => $date,
             'editalId' => $editalId,
+            'perPage' => $perPageRaw,
+            'perPageOptions' => $perPageOptions,
             'editais' => Edital::query()->orderByDesc('periodo_inscricao_inicio')->get(['id', 'titulo']),
         ]);
     }
@@ -61,8 +74,13 @@ class InscricaoController extends Controller
         $status = $request->string('status')->value();
         $search = $request->string('q')->value();
         $date = $request->string('data')->value();
+        $perPageRaw = trim((string) $request->string('per_page', '30')->value());
+        $perPageOptions = ['30', '50', '100', 'all'];
+        if (! in_array($perPageRaw, $perPageOptions, true)) {
+            $perPageRaw = '30';
+        }
 
-        $inscricoes = Inscricao::query()
+        $query = Inscricao::query()
             ->where('edital_id', $edital->id)
             ->when($status, fn ($query) => $query->where('status', $status))
             ->when($date, fn ($query) => $query->whereDate('submitted_at', $date))
@@ -74,8 +92,14 @@ class InscricaoController extends Controller
                         ->orWhere('cpf', 'like', '%'.$search.'%');
                 });
             })
-            ->latest('submitted_at')
-            ->paginate(20)
+            ->latest('submitted_at');
+
+        $perPage = $perPageRaw === 'all'
+            ? max(1, (clone $query)->count())
+            : (int) $perPageRaw;
+
+        $inscricoes = $query
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('admin.inscricoes.index', [
@@ -84,6 +108,8 @@ class InscricaoController extends Controller
             'status' => $status,
             'search' => $search,
             'date' => $date,
+            'perPage' => $perPageRaw,
+            'perPageOptions' => $perPageOptions,
         ]);
     }
 

@@ -21,6 +21,11 @@ class EditalController extends Controller
     {
         $q = trim((string) $request->string('q')->value());
         $status = trim((string) $request->string('status')->value());
+        $perPageRaw = trim((string) $request->string('per_page', '10')->value());
+        $perPageOptions = ['10', '20', '50', '100', 'all'];
+        if (! in_array($perPageRaw, $perPageOptions, true)) {
+            $perPageRaw = '10';
+        }
         $statusesPermitidos = ['RASCUNHO', 'AGUARDANDO', 'ABERTO', 'ENCERRADO'];
         if (! in_array($status, $statusesPermitidos, true)) {
             $status = '';
@@ -191,10 +196,16 @@ class EditalController extends Controller
                 });
         }
 
+        $perPage = $perPageRaw === 'all'
+            ? max(1, (clone $query)->count())
+            : (int) $perPageRaw;
+
         return view('admin.editais.index', [
-            'editais' => $query->latest('periodo_inscricao_inicio')->paginate(12)->withQueryString(),
+            'editais' => $query->latest('periodo_inscricao_inicio')->paginate($perPage)->withQueryString(),
             'q' => $q,
             'status' => $status,
+            'perPage' => $perPageRaw,
+            'perPageOptions' => $perPageOptions,
             'meses' => $meses,
             'anosDisponiveis' => $anosDisponiveis,
             'statusOptions' => $statusesPermitidos,

@@ -24,6 +24,7 @@
             <input type="hidden" name="status" value="{{ $status }}">
             <input type="hidden" name="cards_inicio" value="{{ $cardsInicio }}">
             <input type="hidden" name="cards_fim" value="{{ $cardsFim }}">
+            <input type="hidden" name="per_page" value="{{ $perPage }}">
 
             <div>
                 <x-input-label for="grafico_edital_id" value="Edital (gráficos)" />
@@ -101,7 +102,7 @@
                     <div class="mt-3 flex items-end justify-end md:mt-0 md:pb-[2px]">
                         <div class="flex gap-2">
                             @if ($cardsFiltroAlterado)
-                                <a href="{{ route('admin.painel', ['grafico_edital_id' => $graficoEditalId, 'grafico_inicio' => $graficoInicio, 'grafico_fim' => $graficoFim]) }}" class="btn-muted whitespace-nowrap">Limpar filtro</a>
+                                <a href="{{ route('admin.painel', ['grafico_edital_id' => $graficoEditalId, 'per_page' => $perPage]) }}" class="btn-muted whitespace-nowrap">Limpar filtro</a>
                             @endif
                             <a href="{{ route('admin.editais.create') }}" class="btn-primary whitespace-nowrap">+ Novo Edital</a>
                         </div>
@@ -115,107 +116,143 @@
                 Nenhum edital encontrado com os filtros atuais.
             </div>
         @else
-            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                @foreach ($editais as $edital)
-                    @php
-                        $badgeClass = match($edital->status) {
-                            'ABERTO' => 'status-homologada',
-                            'RASCUNHO' => 'status-indeferida',
-                            'ENCERRADO' => 'bg-slate-200 text-slate-700',
-                            default => 'status-recebida',
-                        };
-                    @endphp
-                    <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                        <div class="flex items-start justify-between gap-3">
-                            <h3 class="text-base font-bold text-slate-900">{{ $edital->titulo }}</h3>
-                            <span class="status-badge {{ $badgeClass }}">{{ $edital->status }}</span>
-                        </div>
-
-                        <p class="mt-2 text-sm text-slate-600">{{ \Illuminate\Support\Str::limit($edital->descricao ?: 'Sem descrição', 110) }}</p>
-
-                        <dl class="mt-4 space-y-1 text-xs text-slate-500">
-                            <div class="flex justify-between gap-3">
-                                <dt>Início</dt>
-                                <dd class="font-semibold text-slate-700">{{ $edital->periodo_inscricao_inicio->format('d/m/Y H:i') }}</dd>
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    @foreach ($editais as $edital)
+                        @php
+                            $badgeClass = match($edital->status) {
+                                'ABERTO' => 'status-homologada',
+                                'RASCUNHO' => 'status-indeferida',
+                                'ENCERRADO' => 'bg-slate-200 text-slate-700',
+                                default => 'status-recebida',
+                            };
+                        @endphp
+                        <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                            <div class="flex items-start justify-between gap-3">
+                                <h3 class="text-base font-bold text-slate-900">{{ $edital->titulo }}</h3>
+                                <span class="status-badge {{ $badgeClass }}">{{ $edital->status }}</span>
                             </div>
-                            <div class="flex justify-between gap-3">
-                                <dt>Fim</dt>
-                                <dd class="font-semibold text-slate-700">{{ $edital->periodo_inscricao_fim->format('d/m/Y H:i') }}</dd>
-                            </div>
-                        </dl>
 
-                        <div class="mt-3">
-                            <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Documentos exigidos</p>
-                            @if ($edital->documentosRequeridos->isEmpty())
-                                <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-600">Sem documentos exigidos</span>
-                            @else
-                                <div class="flex flex-wrap gap-1.5">
-                                    @foreach ($edital->documentosRequeridos as $doc)
-                                        <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-700">{{ $doc->tipo }}</span>
-                                    @endforeach
+                            <p class="mt-2 text-sm text-slate-600">{{ \Illuminate\Support\Str::limit($edital->descricao ?: 'Sem descrição', 110) }}</p>
+
+                            <dl class="mt-4 space-y-1 text-xs text-slate-500">
+                                <div class="flex justify-between gap-3">
+                                    <dt>Início</dt>
+                                    <dd class="font-semibold text-slate-700">{{ $edital->periodo_inscricao_inicio->format('d/m/Y H:i') }}</dd>
                                 </div>
-                            @endif
-                        </div>
+                                <div class="flex justify-between gap-3">
+                                    <dt>Fim</dt>
+                                    <dd class="font-semibold text-slate-700">{{ $edital->periodo_inscricao_fim->format('d/m/Y H:i') }}</dd>
+                                </div>
+                            </dl>
 
-                        <form method="POST" action="{{ route('admin.editais.publicacao', $edital) }}" class="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                            @csrf
-                            <div class="flex items-center justify-between gap-3">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Publicado</p>
-                                <label class="relative inline-flex cursor-pointer items-center">
-                                    <input
-                                        type="checkbox"
-                                        name="publicado"
-                                        value="1"
-                                        class="peer sr-only"
-                                        @checked($edital->publicado)
-                                        onchange="this.form.submit()"
-                                    >
-                                    <div class="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-emerald-500"></div>
-                                    <span class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-5"></span>
-                                </label>
+                            <div class="mt-3">
+                                <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Documentos exigidos</p>
+                                @if ($edital->documentosRequeridos->isEmpty())
+                                    <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-600">Sem documentos exigidos</span>
+                                @else
+                                    <div class="flex flex-wrap gap-1.5">
+                                        @foreach ($edital->documentosRequeridos as $doc)
+                                            <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-700">{{ $doc->tipo }}</span>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </div>
-                        </form>
 
-                        <div class="mt-5 flex items-center gap-2 text-sm">
-                            <a
-                                href="{{ route('admin.inscricoes.index', ['edital_id' => $edital->id]) }}"
-                                class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 transition hover:bg-blue-100"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M2 5a2 2 0 012-2h6.586a1 1 0 01.707.293l1.414 1.414H16a2 2 0 012 2v1H2V5z" />
-                                    <path d="M2 9h16v6a2 2 0 01-2 2H4a2 2 0 01-2-2V9z" />
-                                </svg>
-                                Inscrições
-                            </a>
-                            <a
-                                href="{{ route('admin.editais.edit', $edital) }}"
-                                class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700 transition hover:bg-slate-100"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.46.263l-3.5.875a1 1 0 01-1.213-1.213l.875-3.5a1 1 0 01.263-.46l9.9-9.9a2 2 0 012.828 0z" />
-                                </svg>
-                                Editar
-                            </a>
-                            <form method="POST" id="delete-edital-{{ $edital->id }}" action="{{ route('admin.editais.destroy', $edital) }}">
+                            <form method="POST" action="{{ route('admin.editais.publicacao', $edital) }}" class="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                                 @csrf
-                                @method('DELETE')
-                                <button
-                                    class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700 transition hover:bg-red-100"
-                                    type="button"
-                                    @click="openDeleteModal({{ $edital->id }}, @js($edital->titulo))"
+                                <div class="flex items-center justify-between gap-3">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Publicado</p>
+                                    <label class="relative inline-flex cursor-pointer items-center">
+                                        <input
+                                            type="checkbox"
+                                            name="publicado"
+                                            value="1"
+                                            class="peer sr-only"
+                                            @checked($edital->publicado)
+                                            onchange="this.form.submit()"
+                                        >
+                                        <div class="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-emerald-500"></div>
+                                        <span class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-5"></span>
+                                    </label>
+                                </div>
+                            </form>
+
+                            <div class="mt-5 flex items-center gap-2 text-sm">
+                                <a
+                                    href="{{ route('admin.inscricoes.index', ['edital_id' => $edital->id]) }}"
+                                    class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 transition hover:bg-blue-100"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M8.257 3.099c.366-.446.911-.699 1.486-.699h.514c.575 0 1.12.253 1.486.699L12.5 4H16a1 1 0 110 2h-.617l-.666 9.327A2 2 0 0112.722 17H7.278a2 2 0 01-1.995-1.673L4.617 6H4a1 1 0 010-2h3.5l.757-.901zM8 8a1 1 0 012 0v5a1 1 0 11-2 0V8zm4-1a1 1 0 10-2 0v6a1 1 0 102 0V7z" clip-rule="evenodd" />
+                                        <path d="M2 5a2 2 0 012-2h6.586a1 1 0 01.707.293l1.414 1.414H16a2 2 0 012 2v1H2V5z" />
+                                        <path d="M2 9h16v6a2 2 0 01-2 2H4a2 2 0 01-2-2V9z" />
                                     </svg>
-                                    Excluir
-                                </button>
-                            </form>
-                        </div>
-                    </article>
-                @endforeach
-            </div>
+                                    Inscrições
+                                </a>
+                                <a
+                                    href="{{ route('admin.editais.edit', $edital) }}"
+                                    class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700 transition hover:bg-slate-100"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.46.263l-3.5.875a1 1 0 01-1.213-1.213l.875-3.5a1 1 0 01.263-.46l9.9-9.9a2 2 0 012.828 0z" />
+                                    </svg>
+                                    Editar
+                                </a>
+                                <form method="POST" id="delete-edital-{{ $edital->id }}" action="{{ route('admin.editais.destroy', $edital) }}">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button
+                                        class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700 transition hover:bg-red-100"
+                                        type="button"
+                                        @click="openDeleteModal({{ $edital->id }}, @js($edital->titulo))"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M8.257 3.099c.366-.446.911-.699 1.486-.699h.514c.575 0 1.12.253 1.486.699L12.5 4H16a1 1 0 110 2h-.617l-.666 9.327A2 2 0 0112.722 17H7.278a2 2 0 01-1.995-1.673L4.617 6H4a1 1 0 010-2h3.5l.757-.901zM8 8a1 1 0 012 0v5a1 1 0 11-2 0V8zm4-1a1 1 0 10-2 0v6a1 1 0 102 0V7z" clip-rule="evenodd" />
+                                        </svg>
+                                        Excluir
+                                    </button>
+                                </form>
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
 
-            <div>{{ $editais->links() }}</div>
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3">
+                    <form method="GET" class="flex items-center gap-2">
+                        <input type="hidden" name="q" value="{{ $q }}">
+                        <input type="hidden" name="status" value="{{ $status }}">
+                        <input type="hidden" name="grafico_edital_id" value="{{ $graficoEditalId }}">
+                        <input type="hidden" name="cards_inicio" value="{{ $cardsInicio }}">
+                        <input type="hidden" name="cards_fim" value="{{ $cardsFim }}">
+                        <label for="per_page_bottom" class="text-sm text-slate-600">Itens por página</label>
+                        <select id="per_page_bottom" name="per_page" class="rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
+                            @foreach ($perPageOptions as $option)
+                                <option value="{{ $option }}" @selected((string) $perPage === (string) $option)>
+                                    {{ $option === 'all' ? 'Todos' : $option }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </form>
+
+                    <div class="flex items-center gap-2">
+                        @if ($editais->previousPageUrl())
+                            <a href="{{ $editais->previousPageUrl() }}" class="btn-muted">Anterior</a>
+                        @else
+                            <span class="btn-muted cursor-not-allowed opacity-50">Anterior</span>
+                        @endif
+
+                        <span class="text-sm text-slate-600">
+                            Página {{ $editais->currentPage() }} de {{ max(1, $editais->lastPage()) }}
+                        </span>
+
+                        @if ($editais->nextPageUrl())
+                            <a href="{{ $editais->nextPageUrl() }}" class="btn-muted">Próximo</a>
+                        @else
+                            <span class="btn-muted cursor-not-allowed opacity-50">Próximo</span>
+                        @endif
+                    </div>
+                </div>
+            </div>
         @endif
 
         <div
