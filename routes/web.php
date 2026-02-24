@@ -16,6 +16,9 @@ Route::get('/', [PublicPortalController::class, 'index'])->name('home');
 Route::post('/inscricoes/verificar', [PublicPortalController::class, 'verificarInscricao'])
     ->middleware('throttle:8,1')
     ->name('public.inscricoes.verificar');
+Route::post('/inscricoes/{inscricao}/enviar-informacoes', [PublicPortalController::class, 'enviarInformacoesCompletas'])
+    ->middleware('throttle:4,1')
+    ->name('public.inscricoes.enviar-informacoes');
 
 Route::get('/editais/{edital}/inscricao', [PublicInscricaoController::class, 'create'])->name('public.inscricao.create');
 Route::get('/editais/{edital}/arquivo', [PublicPortalController::class, 'downloadEdital'])->name('public.editais.download');

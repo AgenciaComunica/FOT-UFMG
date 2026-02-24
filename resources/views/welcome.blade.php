@@ -226,7 +226,7 @@
                             @else
                                 <div class="space-y-3">
                                     @foreach ($consultaResultados as $item)
-                                        <article class="rounded-lg border border-slate-200 p-4 text-sm">
+                                        <article class="rounded-lg border border-slate-200 p-4 text-sm" x-data="{ openEmailModal: false }">
                                             <div class="grid gap-2 md:grid-cols-2">
                                                 <p><strong>Protocolo:</strong> {{ $item['protocolo'] ?? '-' }}</p>
                                                 <p><strong>Status:</strong> {{ $item['status'] ?? '-' }}</p>
@@ -245,6 +245,45 @@
                                                 <p><strong>Enviado em:</strong> {{ $item['submitted_at'] ?? '-' }}</p>
                                                 <p><strong>Decidido em:</strong> {{ $item['decided_at'] ?? '-' }}</p>
                                             </div>
+                                            <div class="mt-3">
+                                                <button type="button" @click="openEmailModal = true" class="btn-primary">
+                                                    Enviar informações completas por email
+                                                </button>
+                                            </div>
+
+                                            <div
+                                                x-show="openEmailModal"
+                                                x-transition
+                                                class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4"
+                                                style="display: none;"
+                                            >
+                                                <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+                                                    <h4 class="text-base font-semibold text-slate-900">Confirmar envio por e-mail</h4>
+                                                    <p class="mt-2 text-sm text-slate-600">Digite o e-mail cadastrado na inscrição para receber as informações completas.</p>
+
+                                                    <form method="POST" action="{{ route('public.inscricoes.enviar-informacoes', $item['id']) }}" class="mt-4 space-y-3">
+                                                        @csrf
+                                                        <input type="hidden" name="consulta_termo" value="{{ $consultaTermo }}">
+                                                        <div>
+                                                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">E-mail cadastrado</label>
+                                                            <input type="email" name="email" class="input-base" placeholder="Digite seu e-mail" required>
+                                                        </div>
+                                                        <div class="flex justify-end gap-2">
+                                                            <button type="button" @click="openEmailModal = false" class="btn-muted">Cancelar</button>
+                                                            <button type="submit" class="btn-primary">Enviar</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+
+                                            @if (!empty($infoEmailError) && (int) $infoEmailTargetId === (int) ($item['id'] ?? 0))
+                                                <div class="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
+                                                    <span class="inline-flex items-center rounded-full border border-amber-400 bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                                                        Atenção
+                                                    </span>
+                                                    <p class="mt-1 text-xs font-semibold text-amber-800">{{ $infoEmailError }}</p>
+                                                </div>
+                                            @endif
                                             @if (empty($item['email_verificado']) && !empty($item['id']))
                                                 <div class="mt-3 flex flex-wrap items-center gap-2">
                                                     <form method="POST" action="{{ route('public.inscricao.email.reenviar', $item['id']) }}">

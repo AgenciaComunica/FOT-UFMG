@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\InscricaoInformacoesCompletasMail;
 use App\Models\Edital;
 use App\Models\Inscricao;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -71,6 +73,8 @@ class PublicPortalController extends Controller
             'filtroAlterado' => $q !== '' || (bool) $dateStart || (bool) $dateEnd,
             'consultaResultados' => $request->session()->pull('consulta_resultados', []),
             'consultaTermo' => $request->session()->pull('consulta_termo', ''),
+            'infoEmailError' => $request->session()->pull('info_email_error', ''),
+            'infoEmailTargetId' => (int) $request->session()->pull('info_email_target_id', 0),
             'honeypotField' => config('inscricoes.honeypot_field', 'website'),
         ]);
     }
@@ -87,45 +91,67 @@ class PublicPortalController extends Controller
         ]);
 
         $rawTerm = trim((string) $validated['busca']);
-        $lowerTerm = mb_strtolower($rawTerm);
-        $cpfDigits = preg_replace('/\D+/', '', $rawTerm) ?: '';
-
-        $query = Inscricao::query()
-            ->with('edital:id,titulo,publicado')
-            ->whereHas('edital', fn ($q) => $q->where('publicado', true))
-            ->where(function ($q) use ($rawTerm, $lowerTerm, $cpfDigits) {
-                $q->where('protocolo', $rawTerm)
-                    ->orWhereRaw('LOWER(email) = ?', [$lowerTerm]);
-
-                if ($cpfDigits !== '') {
-                    $q->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), '/', ''), ' ', '') = ?", [$cpfDigits]);
-                }
-            })
-            ->latest('submitted_at')
-            ->limit(10)
-            ->get();
-
-        $resultados = $query->map(function (Inscricao $inscricao) {
-            return [
-                'id' => $inscricao->id,
-                'protocolo' => $inscricao->protocolo,
-                'nome_completo' => $this->maskNome($inscricao->nome_completo),
-                'email' => $this->maskEmail($inscricao->email),
-                'cpf' => $this->maskCpf($inscricao->cpf),
-                'status' => $this->statusPublico($inscricao->status),
-                'email_verificado' => $inscricao->email_verified_at !== null,
-                'resend_key' => hash_hmac('sha256', $inscricao->id.'|'.$inscricao->email, (string) config('app.key')),
-                'edital' => $inscricao->edital?->titulo ?? '-',
-                'submitted_at' => optional($inscricao->submitted_at)->format('d/m/Y H:i'),
-                'decided_at' => optional($inscricao->decided_at)->format('d/m/Y H:i'),
-            ];
-        })->values()->all();
+        $resultados = $this->buildConsultaResultados($rawTerm);
 
         return redirect()
             ->route('home', ['tab' => 'verificar'])
             ->with([
-            'consulta_resultados' => $resultados,
-            'consulta_termo' => $rawTerm,
+                'consulta_resultados' => $resultados,
+                'consulta_termo' => $rawTerm,
+            ]);
+    }
+
+    public function enviarInformacoesCompletas(Request $request, Inscricao $inscricao): RedirectResponse
+    {
+        abort_unless($inscricao->edital?->publicado, 404);
+
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:160'],
+            'consulta_termo' => ['nullable', 'string', 'max:160'],
+        ], [
+            'email.required' => 'Informe o e-mail para envio.',
+            'email.email' => 'Informe um e-mail válido.',
+        ]);
+
+        $consultaTermo = trim((string) ($validated['consulta_termo'] ?? ''));
+        if ($consultaTermo === '') {
+            $consultaTermo = $inscricao->protocolo;
+        }
+
+        $resultados = $this->buildConsultaResultados($consultaTermo);
+        $emailInformado = mb_strtolower(trim((string) $validated['email']));
+        $emailInscricao = mb_strtolower(trim((string) $inscricao->email));
+
+        if ($emailInformado !== $emailInscricao) {
+            return redirect()
+                ->route('home', ['tab' => 'verificar'])
+                ->with([
+                    'consulta_resultados' => $resultados,
+                    'consulta_termo' => $consultaTermo,
+                    'info_email_error' => 'Se o e-mail não confere ou não for lembrado, entre em contato com a secretaria com urgência.',
+                    'info_email_target_id' => $inscricao->id,
+                ]);
+        }
+
+        try {
+            Mail::to($inscricao->email)->send(new InscricaoInformacoesCompletasMail($inscricao));
+        } catch (\Throwable) {
+            return redirect()
+                ->route('home', ['tab' => 'verificar'])
+                ->with([
+                    'consulta_resultados' => $resultados,
+                    'consulta_termo' => $consultaTermo,
+                    'info_email_error' => 'Não foi possível enviar o e-mail agora. Tente novamente em instantes.',
+                    'info_email_target_id' => $inscricao->id,
+                ]);
+        }
+
+        return redirect()
+            ->route('home', ['tab' => 'verificar'])
+            ->with([
+                'consulta_resultados' => $resultados,
+                'consulta_termo' => $consultaTermo,
+                'status' => 'Informações completas enviadas para o e-mail cadastrado.',
             ]);
     }
 
@@ -218,5 +244,45 @@ class PublicPortalController extends Controller
         $ultimo = $partes[count($partes) - 1];
 
         return $primeiro.' '.mb_substr($ultimo, 0, 1).'.';
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildConsultaResultados(string $rawTerm): array
+    {
+        $lowerTerm = mb_strtolower($rawTerm);
+        $cpfDigits = preg_replace('/\D+/', '', $rawTerm) ?: '';
+
+        $query = Inscricao::query()
+            ->with('edital:id,titulo,publicado')
+            ->whereHas('edital', fn ($q) => $q->where('publicado', true))
+            ->where(function ($q) use ($rawTerm, $lowerTerm, $cpfDigits) {
+                $q->where('protocolo', $rawTerm)
+                    ->orWhereRaw('LOWER(email) = ?', [$lowerTerm]);
+
+                if ($cpfDigits !== '') {
+                    $q->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), '/', ''), ' ', '') = ?", [$cpfDigits]);
+                }
+            })
+            ->latest('submitted_at')
+            ->limit(10)
+            ->get();
+
+        return $query->map(function (Inscricao $inscricao): array {
+            return [
+                'id' => $inscricao->id,
+                'protocolo' => $inscricao->protocolo,
+                'nome_completo' => $this->maskNome($inscricao->nome_completo),
+                'email' => $this->maskEmail($inscricao->email),
+                'cpf' => $this->maskCpf($inscricao->cpf),
+                'status' => $this->statusPublico($inscricao->status),
+                'email_verificado' => $inscricao->email_verified_at !== null,
+                'resend_key' => hash_hmac('sha256', $inscricao->id.'|'.$inscricao->email, (string) config('app.key')),
+                'edital' => $inscricao->edital?->titulo ?? '-',
+                'submitted_at' => optional($inscricao->submitted_at)->format('d/m/Y H:i'),
+                'decided_at' => optional($inscricao->decided_at)->format('d/m/Y H:i'),
+            ];
+        })->values()->all();
     }
 }
