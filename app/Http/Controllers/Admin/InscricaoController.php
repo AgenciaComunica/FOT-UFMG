@@ -26,14 +26,7 @@ class InscricaoController extends Controller
 {
     public function index(Request $request): View
     {
-        $status = $request->string('status')->value();
-        $search = $request->string('q')->value();
-        $dateStart = $this->parseDate($request->string('data_inicio')->value(), false);
-        $dateEnd = $this->parseDate($request->string('data_fim')->value(), true);
-        if ($dateStart && $dateEnd && $dateStart->gt($dateEnd)) {
-            [$dateStart, $dateEnd] = [$dateEnd->copy()->startOfDay(), $dateStart->copy()->endOfDay()];
-        }
-        $editalId = (int) $request->integer('edital_id', 0);
+        ['status' => $status, 'search' => $search, 'dateStart' => $dateStart, 'dateEnd' => $dateEnd, 'editalId' => $editalId] = $this->extractIndexFilters($request);
         $perPageRaw = trim((string) $request->string('per_page', '30')->value());
         $perPageOptions = ['30', '50', '100', 'all'];
         if (! in_array($perPageRaw, $perPageOptions, true)) {
@@ -45,21 +38,7 @@ class InscricaoController extends Controller
             || (bool) $dateStart
             || (bool) $dateEnd;
 
-        $query = Inscricao::query()
-            ->with('edital')
-            ->when($editalId > 0, fn ($query) => $query->where('edital_id', $editalId))
-            ->when($status, fn ($query) => $query->where('status', $status))
-            ->when($dateStart && $dateEnd, fn ($query) => $query->whereBetween('submitted_at', [$dateStart, $dateEnd]))
-            ->when($search, function ($query) use ($search) {
-                $query->where(function ($nested) use ($search) {
-                    $nested
-                        ->where('nome_completo', 'like', '%'.$search.'%')
-                        ->orWhere('protocolo', 'like', '%'.$search.'%')
-                        ->orWhere('email', 'like', '%'.$search.'%')
-                        ->orWhere('cpf', 'like', '%'.$search.'%');
-                });
-            })
-            ->latest('submitted_at');
+        $query = $this->buildIndexQuery($status, $search, $dateStart, $dateEnd, $editalId);
 
         $perPage = $perPageRaw === 'all'
             ? max(1, (clone $query)->count())
@@ -83,6 +62,35 @@ class InscricaoController extends Controller
         ]);
     }
 
+    public function exportXls(Request $request)
+    {
+        ['status' => $status, 'search' => $search, 'dateStart' => $dateStart, 'dateEnd' => $dateEnd, 'editalId' => $editalId] = $this->extractIndexFilters($request);
+
+        $inscricoes = $this->buildIndexQuery($status, $search, $dateStart, $dateEnd, $editalId)
+            ->get();
+
+        $logoBase64 = null;
+        $logoPath = public_path('images/Icone-FTO.png');
+        if (is_file($logoPath)) {
+            $logoBase64 = 'data:image/png;base64,'.base64_encode((string) file_get_contents($logoPath));
+        }
+
+        $filename = 'inscricoes-'.now()->format('Ymd-His').'.xls';
+
+        return response()
+            ->view('admin.inscricoes.export_xls', [
+                'inscricoes' => $inscricoes,
+                'logoBase64' => $logoBase64,
+                'status' => $status,
+                'search' => $search,
+                'dateStart' => $dateStart?->format('d/m/Y'),
+                'dateEnd' => $dateEnd?->format('d/m/Y'),
+                'edital' => $editalId > 0 ? Edital::query()->find($editalId) : null,
+            ])
+            ->header('Content-Type', 'application/vnd.ms-excel; charset=UTF-8')
+            ->header('Content-Disposition', 'attachment; filename="'.$filename.'"');
+    }
+
     private function parseDate(?string $value, bool $endOfDay): ?Carbon
     {
         if (! filled($value)) {
@@ -96,6 +104,42 @@ class InscricaoController extends Controller
         }
 
         return $endOfDay ? $date->endOfDay() : $date->startOfDay();
+    }
+
+    private function buildIndexQuery(string $status, string $search, ?Carbon $dateStart, ?Carbon $dateEnd, int $editalId)
+    {
+        return Inscricao::query()
+            ->with('edital')
+            ->when($editalId > 0, fn ($query) => $query->where('edital_id', $editalId))
+            ->when($status, fn ($query) => $query->where('status', $status))
+            ->when($dateStart && $dateEnd, fn ($query) => $query->whereBetween('submitted_at', [$dateStart, $dateEnd]))
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested
+                        ->where('nome_completo', 'like', '%'.$search.'%')
+                        ->orWhere('protocolo', 'like', '%'.$search.'%')
+                        ->orWhere('email', 'like', '%'.$search.'%')
+                        ->orWhere('cpf', 'like', '%'.$search.'%');
+                });
+            })
+            ->latest('submitted_at');
+    }
+
+    /**
+     * @return array{status:string,search:string,dateStart:?Carbon,dateEnd:?Carbon,editalId:int}
+     */
+    private function extractIndexFilters(Request $request): array
+    {
+        $status = $request->string('status')->value();
+        $search = $request->string('q')->value();
+        $dateStart = $this->parseDate($request->string('data_inicio')->value(), false);
+        $dateEnd = $this->parseDate($request->string('data_fim')->value(), true);
+        if ($dateStart && $dateEnd && $dateStart->gt($dateEnd)) {
+            [$dateStart, $dateEnd] = [$dateEnd->copy()->startOfDay(), $dateStart->copy()->endOfDay()];
+        }
+        $editalId = (int) $request->integer('edital_id', 0);
+
+        return compact('status', 'search', 'dateStart', 'dateEnd', 'editalId');
     }
 
     public function byEdital(Edital $edital, Request $request): View

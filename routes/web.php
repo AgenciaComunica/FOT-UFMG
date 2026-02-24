@@ -47,6 +47,7 @@ Route::prefix('admin')
     ->group(function () {
         Route::get('/painel', [AdminEditalController::class, 'index'])->name('painel');
         Route::get('/inscricoes', [AdminInscricaoController::class, 'index'])->name('inscricoes.index');
+        Route::get('/inscricoes/exportar.xls', [AdminInscricaoController::class, 'exportXls'])->name('inscricoes.export');
         Route::resource('editais', AdminEditalController::class, ['parameters' => ['editais' => 'edital']])->except(['show']);
         Route::resource('docentes', AdminDocenteController::class, ['parameters' => ['docentes' => 'docente']])->except(['show']);
         Route::post('docentes/importar', [AdminDocenteController::class, 'import'])->name('docentes.import');

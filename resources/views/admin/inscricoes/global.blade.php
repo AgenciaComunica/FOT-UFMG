@@ -50,6 +50,11 @@
                     <a href="{{ route('admin.inscricoes.index') }}" class="btn-muted">Limpar</a>
                 </div>
             @endif
+            <div class="flex items-end gap-2">
+                <a href="{{ route('admin.inscricoes.export', request()->query()) }}" class="inline-flex h-[42px] items-center rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700">
+                    Exportar
+                </a>
+            </div>
         </form>
 
         <div class="table-wrap">
