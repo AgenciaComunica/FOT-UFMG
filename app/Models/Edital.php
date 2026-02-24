@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Edital extends Model
@@ -42,6 +43,14 @@ class Edital extends Model
     public function inscricoes(): HasMany
     {
         return $this->hasMany(Inscricao::class);
+    }
+
+    public function docentesBanca(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'edital_docentes')
+            ->withPivot('ordem')
+            ->withTimestamps()
+            ->orderBy('edital_docentes.ordem');
     }
 
     public function getStatusAttribute(): string

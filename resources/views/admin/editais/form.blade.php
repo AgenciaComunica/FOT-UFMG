@@ -23,7 +23,7 @@
             $hasArquivoAtual = (bool) $edital->arquivo_path;
         @endphp
 
-        <form method="POST" action="{{ $formAction }}" enctype="multipart/form-data" class="panel-card space-y-6" x-data="editalDocsForm(@js($documentosInitial), {{ $publicadoInicial ? 'true' : 'false' }}, {{ $isEdit ? 'true' : 'false' }}, {{ $hasArquivoAtual ? 'true' : 'false' }}, @js($edital->titulo ?? ''))">
+        <form method="POST" action="{{ $formAction }}" enctype="multipart/form-data" class="panel-card space-y-6" x-data="editalDocsForm(@js($documentosInitial), @js($bancaDocentesInitial), @js($docentesDisponiveis), {{ $publicadoInicial ? 'true' : 'false' }}, {{ $isEdit ? 'true' : 'false' }}, {{ $hasArquivoAtual ? 'true' : 'false' }}, @js($edital->titulo ?? ''))">
             @csrf
             @if ($method !== 'POST')
                 @method($method)
@@ -83,6 +83,52 @@
                             <a href="{{ route('public.editais.download', $edital) }}" class="font-semibold text-blue-700 hover:underline">Baixar</a>
                         </p>
                     @endif
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900">Banca de Docentes</h3>
+                    <p class="text-xs text-slate-500">Defina os docentes que irão avaliar os alunos deste edital.</p>
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <template x-for="(docenteId, index) in bancaDocentes" :key="`banca-${index}`">
+                        <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div class="mb-3 flex items-center justify-between gap-2">
+                                <p class="text-sm font-semibold text-slate-700" x-text="`Docente ${index + 1}`"></p>
+                                <button type="button" @click="removeBanca(index)" class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-200 bg-red-50 text-lg font-semibold leading-none text-red-600 hover:bg-red-100" title="Remover docente">
+                                    x
+                                </button>
+                            </div>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Selecionar docente</label>
+                                    <select :name="`banca_docentes[${index}]`" x-model="bancaDocentes[index]" class="input-base mt-1">
+                                        <option value="">Selecione</option>
+                                        <template x-for="docente in availableDocentes(index)" :key="`opt-${index}-${docente.id}`">
+                                            <option :value="String(docente.id)" x-text="`${docente.name} (${docente.email})${docente.ativo ? '' : ' - Inativo'}`"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <button type="button" @click="sortearDocente(index)" class="btn-muted !text-xs !px-3 !py-1.5">Sortear</button>
+                            </div>
+                        </article>
+                    </template>
+
+                    <button
+                        type="button"
+                        @click="addBancaSlot()"
+                        class="flex min-h-[180px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 text-slate-500 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700"
+                    >
+                        <span class="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full border border-slate-300 bg-white text-2xl font-bold">+</span>
+                        <span class="inline-flex items-center gap-1.5 text-sm font-semibold">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10 2a5 5 0 100 10 5 5 0 000-10zM3 17a7 7 0 1114 0H3z" />
+                            </svg>
+                            Adicionar Docente
+                        </span>
+                    </button>
                 </div>
             </div>
 
@@ -155,7 +201,12 @@
                         class="flex min-h-[340px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 text-slate-500 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700"
                     >
                         <span class="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full border border-slate-300 bg-white text-2xl font-bold">+</span>
-                        <span class="text-sm font-semibold">Adicionar Documento</span>
+                        <span class="inline-flex items-center gap-1.5 text-sm font-semibold">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4 3a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V17a2 2 0 01-2 2H6a2 2 0 01-2-2V3zm7 0v3h3l-3-3z" clip-rule="evenodd" />
+                            </svg>
+                            Adicionar Documento
+                        </span>
                     </button>
                 </div>
             </div>
@@ -248,7 +299,7 @@
     </div>
 
     <script>
-        function editalDocsForm(initialDocs, publicadoInicial, isEdit, hasArquivoPersistido, deleteExpectedName) {
+        function editalDocsForm(initialDocs, bancaDocentesInitial, docentesDisponiveis, publicadoInicial, isEdit, hasArquivoPersistido, deleteExpectedName) {
             const normalized = (Array.isArray(initialDocs) ? initialDocs : []).map((doc, idx) => ({
                 key: `doc-${Date.now()}-${idx}`,
                 tipo: doc?.tipo ?? '',
@@ -261,6 +312,10 @@
 
             return {
                 docs: normalized,
+                docentesDisponiveis: Array.isArray(docentesDisponiveis) ? docentesDisponiveis : [],
+                bancaDocentes: (Array.isArray(bancaDocentesInitial) ? bancaDocentesInitial : [])
+                    .map((id) => String(id ?? '').trim())
+                    .filter((id) => id !== ''),
                 publicado: !!publicadoInicial,
                 isEdit: !!isEdit,
                 hasArquivoAtual: !!hasArquivoPersistido,
@@ -275,6 +330,31 @@
                 },
                 fieldArray(index, name) {
                     return `documentos_requeridos[${index}][${name}][]`;
+                },
+                addBancaSlot() {
+                    this.bancaDocentes.push('');
+                },
+                removeBanca(index) {
+                    this.bancaDocentes.splice(index, 1);
+                },
+                selectedDocentes(excludeIndex = null) {
+                    return this.bancaDocentes
+                        .map((id, idx) => ({ id: String(id ?? '').trim(), idx }))
+                        .filter((item) => item.id !== '' && (excludeIndex === null || item.idx !== excludeIndex))
+                        .map((item) => item.id);
+                },
+                availableDocentes(index) {
+                    const selected = this.selectedDocentes(index);
+                    return this.docentesDisponiveis.filter((docente) => !selected.includes(String(docente.id)));
+                },
+                sortearDocente(index) {
+                    const pool = this.availableDocentes(index);
+                    if (pool.length === 0) {
+                        this.bancaDocentes[index] = '';
+                        return;
+                    }
+                    const random = pool[Math.floor(Math.random() * pool.length)];
+                    this.bancaDocentes[index] = String(random.id);
                 },
                 addDocument() {
                     this.docs.push({
@@ -306,6 +386,7 @@
                     if (!inicio) missing.push('Início da inscrição');
                     if (!fim) missing.push('Fim da inscrição');
                     if (!this.hasArquivoAtual) missing.push('Arquivo PDF do edital');
+                    if (this.selectedDocentes().length < 1) missing.push('Banca de Docentes (mínimo 1)');
 
                     return missing;
                 },

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use App\Models\User;
 use Illuminate\Validation\Validator;
 
 class AdminStoreEditalRequest extends FormRequest
@@ -21,6 +22,8 @@ class AdminStoreEditalRequest extends FormRequest
             'arquivo_edital' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
             'periodo_inscricao_inicio' => ['required', 'date'],
             'periodo_inscricao_fim' => ['required', 'date', 'after_or_equal:periodo_inscricao_inicio'],
+            'banca_docentes' => ['nullable', 'array'],
+            'banca_docentes.*' => ['nullable', 'integer', 'exists:users,id'],
             'documentos_requeridos' => ['nullable', 'array'],
             'documentos_requeridos.*.tipo' => ['required_with:documentos_requeridos', 'string', 'max:120'],
             'documentos_requeridos.*.formatos_aceitos' => ['required_with:documentos_requeridos', 'array', 'min:1'],
@@ -38,6 +41,7 @@ class AdminStoreEditalRequest extends FormRequest
             'periodo_inscricao_fim.required' => 'Informe a data/hora de fim da inscrição.',
             'periodo_inscricao_fim.after_or_equal' => 'A data/hora de fim deve ser igual ou posterior ao início.',
             'arquivo_edital.mimes' => 'O arquivo do edital deve estar em PDF.',
+            'banca_docentes.*.exists' => 'Selecione apenas docentes válidos para a banca.',
             'documentos_requeridos.*.tipo.required' => 'Informe o nome de cada documento.',
             'documentos_requeridos.*.formatos_aceitos.required' => 'Selecione ao menos um formato aceito para cada documento.',
             'documentos_requeridos.*.formatos_aceitos.min' => 'Selecione ao menos um formato aceito para cada documento.',
@@ -57,8 +61,34 @@ class AdminStoreEditalRequest extends FormRequest
                 $validator->errors()->add('documentos_requeridos', 'Não repita o nome do documento.');
             }
 
+            $docentesIds = collect($this->input('banca_docentes', []))
+                ->filter(fn ($id) => filled($id))
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
+            if ($docentesIds->count() !== $docentesIds->unique()->count()) {
+                $validator->errors()->add('banca_docentes', 'Não repita o mesmo docente na banca.');
+                return;
+            }
+
+            if ($docentesIds->isNotEmpty()) {
+                $validos = User::query()
+                    ->whereIn('id', $docentesIds)
+                    ->where('role', User::ROLE_DOCENTE)
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id);
+
+                if ($validos->count() !== $docentesIds->count()) {
+                    $validator->errors()->add('banca_docentes', 'A banca deve conter apenas usuários do tipo docente.');
+                }
+            }
+
             if (! $this->boolean('publicado')) {
                 return;
+            }
+
+            if ($docentesIds->count() < 1) {
+                $validator->errors()->add('banca_docentes', 'Informe ao menos 1 docente na banca para publicar o edital.');
             }
 
             if (! filled($this->input('descricao'))) {

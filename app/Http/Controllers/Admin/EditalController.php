@@ -7,6 +7,7 @@ use App\Http\Requests\AdminStoreEditalRequest;
 use App\Http\Requests\AdminUpdateEditalRequest;
 use App\Models\Edital;
 use App\Models\Inscricao;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -58,7 +59,10 @@ class EditalController extends Controller
             || (bool) $cardsFim;
 
         $query = Edital::query()
-            ->with(['documentosRequeridos:id,edital_id,tipo,ordem'])
+            ->with([
+                'documentosRequeridos:id,edital_id,tipo,ordem',
+                'docentesBanca:id,name',
+            ])
             ->when($q !== '', function ($builder) use ($q) {
                 $builder->where(function ($nested) use ($q) {
                     $nested
@@ -246,6 +250,11 @@ class EditalController extends Controller
     {
         return view('admin.editais.form', [
             'edital' => new Edital(),
+            'docentesDisponiveis' => User::query()
+                ->where('role', User::ROLE_DOCENTE)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'ativo']),
+            'bancaDocentesInitial' => old('banca_docentes', []),
             'documentosInitial' => old('documentos_requeridos', []),
             'formAction' => route('admin.editais.store'),
             'method' => 'POST',
@@ -281,6 +290,7 @@ class EditalController extends Controller
         }
 
         $this->syncDocumentosRequeridos($edital, $data['documentos_requeridos'] ?? []);
+        $this->syncBancaDocentes($edital, $data['banca_docentes'] ?? []);
 
         return redirect()
             ->route('admin.editais.index')
@@ -289,10 +299,19 @@ class EditalController extends Controller
 
     public function edit(Edital $edital): View
     {
-        $edital->load('documentosRequeridos');
+        $edital->load(['documentosRequeridos', 'docentesBanca']);
 
         return view('admin.editais.form', [
             'edital' => $edital,
+            'docentesDisponiveis' => User::query()
+                ->where('role', User::ROLE_DOCENTE)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'ativo']),
+            'bancaDocentesInitial' => old('banca_docentes', $edital->docentesBanca
+                ->sortBy('pivot.ordem')
+                ->pluck('id')
+                ->values()
+                ->all()),
             'documentosInitial' => old('documentos_requeridos', $edital->documentosRequeridos
                 ->sortBy('ordem')
                 ->map(fn ($doc) => [
@@ -341,6 +360,7 @@ class EditalController extends Controller
         }
 
         $this->syncDocumentosRequeridos($edital, $data['documentos_requeridos'] ?? []);
+        $this->syncBancaDocentes($edital, $data['banca_docentes'] ?? []);
 
         return redirect()
             ->route('admin.editais.index')
@@ -430,6 +450,10 @@ class EditalController extends Controller
             $missing[] = 'Arquivo PDF do edital';
         }
 
+        if (! $edital->docentesBanca()->exists()) {
+            $missing[] = 'Banca de Docentes (mínimo 1)';
+        }
+
         return $missing;
     }
 
@@ -459,5 +483,40 @@ class EditalController extends Controller
 
         $edital->documentosRequeridos()->delete();
         $edital->documentosRequeridos()->createMany($rows);
+    }
+
+    /**
+     * @param  array<int, mixed>  $docentesIds
+     */
+    private function syncBancaDocentes(Edital $edital, array $docentesIds): void
+    {
+        $clean = collect($docentesIds)
+            ->filter(fn ($id) => filled($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($clean->isEmpty()) {
+            $edital->docentesBanca()->detach();
+            return;
+        }
+
+        $validos = User::query()
+            ->whereIn('id', $clean)
+            ->where('role', User::ROLE_DOCENTE)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $payload = [];
+        $ordem = 1;
+        foreach ($clean as $id) {
+            if (! in_array($id, $validos, true)) {
+                continue;
+            }
+            $payload[$id] = ['ordem' => $ordem++];
+        }
+
+        $edital->docentesBanca()->sync($payload);
     }
 }

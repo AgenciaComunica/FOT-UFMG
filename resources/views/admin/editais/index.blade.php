@@ -147,6 +147,19 @@
                             </dl>
 
                             <div class="mt-3">
+                                <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Banca de Docentes</p>
+                                @if ($edital->docentesBanca->isEmpty())
+                                    <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-600">Sem docentes na banca</span>
+                                @else
+                                    <div class="flex flex-wrap gap-1.5">
+                                        @foreach ($edital->docentesBanca as $docente)
+                                            <span class="inline-flex rounded-full bg-blue-50 px-2 py-1 text-[11px] text-blue-700">{{ $docente->name }}</span>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div class="mt-3">
                                 <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Documentos exigidos</p>
                                 @if ($edital->documentosRequeridos->isEmpty())
                                     <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-600">Sem documentos exigidos</span>
