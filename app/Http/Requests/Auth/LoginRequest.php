@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -46,6 +47,14 @@ class LoginRequest extends FormRequest
 
             throw ValidationException::withMessages([
                 'email' => 'E-mail ou senha incorretos.',
+            ]);
+        }
+
+        $user = Auth::user();
+        if ($user && $user->role === User::ROLE_DOCENTE && ! $user->ativo) {
+            Auth::logout();
+            throw ValidationException::withMessages([
+                'email' => 'Docente inativo. Solicite ativação para a secretaria.',
             ]);
         }
 

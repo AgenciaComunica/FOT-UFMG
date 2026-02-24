@@ -10,12 +10,16 @@
                 @if (auth()->user()->role === \App\Models\User::ROLE_ADMIN)
                     <x-nav-link :href="route('admin.painel')" :active="request()->routeIs('admin.painel') || request()->routeIs('admin.editais.*')">Painel</x-nav-link>
                     <x-nav-link :href="route('admin.inscricoes.index')" :active="request()->routeIs('admin.inscricoes.*') || request()->routeIs('admin.editais.inscricoes.*')">Inscrições</x-nav-link>
+                    <x-nav-link :href="route('admin.docentes.index')" :active="request()->routeIs('admin.docentes.*')">Docentes</x-nav-link>
                 @else
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">Dashboard</x-nav-link>
                 @endif
 
                 @if (auth()->user()->role === \App\Models\User::ROLE_ALUNO)
                     <x-nav-link :href="route('aluno.inscricoes.index')" :active="request()->routeIs('aluno.*')">Minhas inscrições</x-nav-link>
+                @endif
+                @if (auth()->user()->role === \App\Models\User::ROLE_DOCENTE)
+                    <x-nav-link :href="route('docente.painel')" :active="request()->routeIs('docente.*')">Painel Docente</x-nav-link>
                 @endif
             </div>
         </div>
@@ -49,11 +53,15 @@
             @if (auth()->user()->role === \App\Models\User::ROLE_ADMIN)
                 <x-responsive-nav-link :href="route('admin.painel')" :active="request()->routeIs('admin.painel') || request()->routeIs('admin.editais.*')">Painel</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.inscricoes.index')" :active="request()->routeIs('admin.inscricoes.*') || request()->routeIs('admin.editais.inscricoes.*')">Inscrições</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.docentes.index')" :active="request()->routeIs('admin.docentes.*')">Docentes</x-responsive-nav-link>
             @else
                 <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">Dashboard</x-responsive-nav-link>
             @endif
             @if (auth()->user()->role === \App\Models\User::ROLE_ALUNO)
                 <x-responsive-nav-link :href="route('aluno.inscricoes.index')" :active="request()->routeIs('aluno.*')">Minhas inscrições</x-responsive-nav-link>
+            @endif
+            @if (auth()->user()->role === \App\Models\User::ROLE_DOCENTE)
+                <x-responsive-nav-link :href="route('docente.painel')" :active="request()->routeIs('docente.*')">Painel Docente</x-responsive-nav-link>
             @endif
         </div>
 

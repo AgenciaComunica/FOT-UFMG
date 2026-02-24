@@ -15,6 +15,7 @@ class User extends Authenticatable
     public const ROLE_ADMIN = 'admin';
     public const ROLE_SECRETARIA = self::ROLE_ADMIN;
     public const ROLE_ALUNO = 'aluno';
+    public const ROLE_DOCENTE = 'docente';
 
     /**
      * @var list<string>
@@ -22,8 +23,10 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'telefone',
         'password',
         'role',
+        'ativo',
     ];
 
     /**
@@ -39,6 +42,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'ativo' => 'boolean',
         ];
     }
 

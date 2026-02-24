@@ -2,8 +2,10 @@
 
 use App\Http\Controllers\Admin\EditalController as AdminEditalController;
 use App\Http\Controllers\Admin\InscricaoController as AdminInscricaoController;
+use App\Http\Controllers\Admin\DocenteController as AdminDocenteController;
 use App\Http\Controllers\Aluno\PainelController;
 use App\Http\Controllers\DashboardRedirectController;
+use App\Http\Controllers\Docente\PainelController as DocentePainelController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicInscricaoController;
 use App\Models\Edital;
@@ -46,6 +48,10 @@ Route::prefix('admin')
         Route::get('/painel', [AdminEditalController::class, 'index'])->name('painel');
         Route::get('/inscricoes', [AdminInscricaoController::class, 'index'])->name('inscricoes.index');
         Route::resource('editais', AdminEditalController::class, ['parameters' => ['editais' => 'edital']])->except(['show']);
+        Route::resource('docentes', AdminDocenteController::class, ['parameters' => ['docentes' => 'docente']])->except(['show']);
+        Route::post('docentes/importar', [AdminDocenteController::class, 'import'])->name('docentes.import');
+        Route::get('docentes/modelo-importacao', [AdminDocenteController::class, 'downloadTemplate'])->name('docentes.template');
+        Route::post('docentes/{docente}/status', [AdminDocenteController::class, 'updateStatus'])->name('docentes.status');
         Route::post('editais/{edital}/publicacao', [AdminEditalController::class, 'updatePublicacao'])->name('editais.publicacao');
 
         Route::get('/editais/{edital}/inscricoes', [AdminInscricaoController::class, 'byEdital'])->name('editais.inscricoes.index');
@@ -69,6 +75,13 @@ Route::prefix('aluno')
         Route::get('/inscricoes', [PainelController::class, 'inscricoes'])->name('inscricoes.index');
         Route::get('/inscricoes/{inscricao}', [PainelController::class, 'show'])->name('inscricoes.show');
         Route::get('/documentos/{doc}/download', [PainelController::class, 'downloadDocumento'])->name('documentos.download');
+    });
+
+Route::prefix('docente')
+    ->middleware(['auth', 'role:'.User::ROLE_DOCENTE])
+    ->name('docente.')
+    ->group(function () {
+        Route::get('/painel', [DocentePainelController::class, 'index'])->name('painel');
     });
 
 require __DIR__.'/auth.php';
