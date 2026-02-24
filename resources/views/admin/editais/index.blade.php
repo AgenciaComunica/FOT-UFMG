@@ -6,7 +6,7 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="deleteEditalModal()">
         @if (session('status'))
             <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{{ session('status') }}</div>
         @endif
@@ -160,12 +160,13 @@
                                 </svg>
                                 Editar
                             </a>
-                            <form method="POST" action="{{ route('admin.editais.destroy', $edital) }}" onsubmit="return confirm('Excluir edital?');">
+                            <form method="POST" id="delete-edital-{{ $edital->id }}" action="{{ route('admin.editais.destroy', $edital) }}">
                                 @csrf
                                 @method('DELETE')
                                 <button
                                     class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700 transition hover:bg-red-100"
-                                    type="submit"
+                                    type="button"
+                                    @click="openDeleteModal({{ $edital->id }}, @js($edital->titulo))"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M8.257 3.099c.366-.446.911-.699 1.486-.699h.514c.575 0 1.12.253 1.486.699L12.5 4H16a1 1 0 110 2h-.617l-.666 9.327A2 2 0 0112.722 17H7.278a2 2 0 01-1.995-1.673L4.617 6H4a1 1 0 010-2h3.5l.757-.901zM8 8a1 1 0 012 0v5a1 1 0 11-2 0V8zm4-1a1 1 0 10-2 0v6a1 1 0 102 0V7z" clip-rule="evenodd" />
@@ -180,5 +181,70 @@
 
             <div>{{ $editais->links() }}</div>
         @endif
+
+        <div
+            x-show="open"
+            x-transition
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4"
+            style="display: none;"
+        >
+            <div class="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+                <h4 class="text-base font-semibold text-slate-900">Excluir edital</h4>
+                <p class="mt-2 text-sm text-slate-600">Digite o nome do edital para confirmar a exclusão:</p>
+                <p class="mt-2 rounded-md bg-slate-100 px-2 py-1 text-sm font-semibold text-slate-800" x-text="expectedName"></p>
+                <div class="mt-3">
+                    <input
+                        type="text"
+                        x-model="typedName"
+                        class="input-base"
+                        placeholder="Digite o nome exato do edital"
+                    >
+                </div>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button type="button" @click="closeModal()" class="btn-muted">Cancelar</button>
+                    <button
+                        type="button"
+                        @click="confirmDelete()"
+                        :disabled="typedName.trim() !== expectedName.trim()"
+                        class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        Excluir
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <script>
+        function deleteEditalModal() {
+            return {
+                open: false,
+                editalId: null,
+                expectedName: '',
+                typedName: '',
+                openDeleteModal(id, titulo) {
+                    this.open = true;
+                    this.editalId = id;
+                    this.expectedName = titulo ?? '';
+                    this.typedName = '';
+                },
+                closeModal() {
+                    this.open = false;
+                    this.editalId = null;
+                    this.expectedName = '';
+                    this.typedName = '';
+                },
+                confirmDelete() {
+                    if (this.typedName.trim() !== this.expectedName.trim() || !this.editalId) {
+                        return;
+                    }
+
+                    const form = document.getElementById(`delete-edital-${this.editalId}`);
+                    if (form) {
+                        form.submit();
+                    }
+                },
+            };
+        }
+    </script>
 </x-app-layout>

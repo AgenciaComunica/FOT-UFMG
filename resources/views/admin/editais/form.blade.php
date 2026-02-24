@@ -23,7 +23,7 @@
             $hasArquivoAtual = (bool) $edital->arquivo_path;
         @endphp
 
-        <form method="POST" action="{{ $formAction }}" enctype="multipart/form-data" class="panel-card space-y-6" x-data="editalDocsForm(@js($documentosInitial), {{ $publicadoInicial ? 'true' : 'false' }}, {{ $isEdit ? 'true' : 'false' }}, {{ $hasArquivoAtual ? 'true' : 'false' }})">
+        <form method="POST" action="{{ $formAction }}" enctype="multipart/form-data" class="panel-card space-y-6" x-data="editalDocsForm(@js($documentosInitial), {{ $publicadoInicial ? 'true' : 'false' }}, {{ $isEdit ? 'true' : 'false' }}, {{ $hasArquivoAtual ? 'true' : 'false' }}, @js($edital->titulo ?? ''))">
             @csrf
             @if ($method !== 'POST')
                 @method($method)
@@ -163,7 +163,7 @@
             <div class="flex flex-wrap gap-3">
                 <button type="button" class="btn-primary" x-text="primaryActionLabel()" @click="handlePrimaryAction()"></button>
                 @if ($edital->exists)
-                    <button type="button" class="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700" @click="confirmDeleteOpen = true">Excluir edital</button>
+                    <button type="button" class="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700" @click="deleteNameConfirm = ''; confirmDeleteOpen = true">Excluir edital</button>
                 @endif
                 <a href="{{ route('admin.editais.index') }}" class="btn-muted">Cancelar</a>
             </div>
@@ -213,10 +213,26 @@
                 >
                     <div class="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
                         <h4 class="text-base font-semibold text-slate-900">Excluir edital</h4>
-                        <p class="mt-2 text-sm text-slate-600">Deseja mesmo excluir este edital?</p>
+                        <p class="mt-2 text-sm text-slate-600">Digite o nome do edital para confirmar a exclusão:</p>
+                        <p class="mt-2 rounded-md bg-slate-100 px-2 py-1 text-sm font-semibold text-slate-800" x-text="deleteExpectedName"></p>
+                        <div class="mt-3">
+                            <input
+                                type="text"
+                                x-model="deleteNameConfirm"
+                                class="input-base"
+                                placeholder="Digite o nome exato do edital"
+                            >
+                        </div>
                         <div class="mt-4 flex justify-end gap-2">
                             <button type="button" @click="confirmDeleteOpen = false" class="btn-muted">Cancelar</button>
-                            <button type="button" @click="submitDelete()" class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700">Excluir</button>
+                            <button
+                                type="button"
+                                @click="submitDelete()"
+                                :disabled="deleteNameConfirm.trim() !== deleteExpectedName.trim()"
+                                class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Excluir
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -232,7 +248,7 @@
     </div>
 
     <script>
-        function editalDocsForm(initialDocs, publicadoInicial, isEdit, hasArquivoPersistido) {
+        function editalDocsForm(initialDocs, publicadoInicial, isEdit, hasArquivoPersistido, deleteExpectedName) {
             const normalized = (Array.isArray(initialDocs) ? initialDocs : []).map((doc, idx) => ({
                 key: `doc-${Date.now()}-${idx}`,
                 tipo: doc?.tipo ?? '',
@@ -250,6 +266,8 @@
                 hasArquivoAtual: !!hasArquivoPersistido,
                 confirmRemoveIndex: null,
                 confirmDeleteOpen: false,
+                deleteExpectedName: deleteExpectedName ?? '',
+                deleteNameConfirm: '',
                 publishBlockModalOpen: false,
                 publishMissingFields: [],
                 field(index, name) {
@@ -330,6 +348,9 @@
                     });
                 },
                 submitDelete() {
+                    if (this.deleteNameConfirm.trim() !== this.deleteExpectedName.trim()) {
+                        return;
+                    }
                     const deleteForm = document.getElementById('delete-edital-form');
                     if (deleteForm) {
                         deleteForm.submit();
