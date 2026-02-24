@@ -2,7 +2,7 @@
     <div class="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div class="flex items-center gap-6">
             <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
-                <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white">FOT</span>
+                <img src="{{ asset('images/Icone-FTO.png') }}" alt="Logo FOT-UFMG" class="h-9 w-9 rounded-lg object-cover">
                 <span class="hidden text-sm font-semibold text-slate-800 md:inline">Secretaria Fisioterapia</span>
             </a>
 
