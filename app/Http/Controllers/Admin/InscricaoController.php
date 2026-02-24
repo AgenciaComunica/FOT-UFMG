@@ -69,18 +69,11 @@ class InscricaoController extends Controller
         $inscricoes = $this->buildIndexQuery($status, $search, $dateStart, $dateEnd, $editalId)
             ->get();
 
-        $logoBase64 = null;
-        $logoPath = public_path('images/Icone-FTO.png');
-        if (is_file($logoPath)) {
-            $logoBase64 = 'data:image/png;base64,'.base64_encode((string) file_get_contents($logoPath));
-        }
-
         $filename = 'inscricoes-'.now()->format('Ymd-His').'.xls';
 
         return response()
             ->view('admin.inscricoes.export_xls', [
                 'inscricoes' => $inscricoes,
-                'logoBase64' => $logoBase64,
                 'status' => $status,
                 'search' => $search,
                 'dateStart' => $dateStart?->format('d/m/Y'),

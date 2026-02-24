@@ -7,7 +7,6 @@
         .header { margin-bottom: 12px; }
         .header-table { width: 100%; border-collapse: collapse; }
         .header-table td { vertical-align: middle; }
-        .logo { width: 48px; height: 48px; object-fit: contain; }
         .title { font-size: 16px; font-weight: 700; }
         .subtitle { font-size: 12px; color: #475569; }
         .filters { margin-top: 8px; margin-bottom: 12px; }
@@ -21,11 +20,6 @@
     <div class="header">
         <table class="header-table">
             <tr>
-                <td style="width:56px;">
-                    @if ($logoBase64)
-                        <img src="{{ $logoBase64 }}" alt="Logo" class="logo">
-                    @endif
-                </td>
                 <td>
                     <div class="title">Relatório de Inscrições</div>
                     <div class="subtitle">Fisioterapia UFMG · Secretaria Digital</div>
