@@ -7,10 +7,11 @@
             </a>
 
             <div class="hidden items-center gap-2 md:flex">
-                <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">Dashboard</x-nav-link>
-
                 @if (auth()->user()->role === \App\Models\User::ROLE_ADMIN)
-                    <x-nav-link :href="route('admin.editais.index')" :active="request()->routeIs('admin.*')">Admin</x-nav-link>
+                    <x-nav-link :href="route('admin.painel')" :active="request()->routeIs('admin.painel') || request()->routeIs('admin.editais.*')">Painel</x-nav-link>
+                    <x-nav-link :href="route('admin.inscricoes.index')" :active="request()->routeIs('admin.inscricoes.*') || request()->routeIs('admin.editais.inscricoes.*')">Inscrições</x-nav-link>
+                @else
+                    <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">Dashboard</x-nav-link>
                 @endif
 
                 @if (auth()->user()->role === \App\Models\User::ROLE_ALUNO)
@@ -45,9 +46,11 @@
 
     <div x-show="open" x-transition class="border-t border-slate-200 bg-white px-4 py-3 md:hidden">
         <div class="space-y-1">
-            <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">Dashboard</x-responsive-nav-link>
             @if (auth()->user()->role === \App\Models\User::ROLE_ADMIN)
-                <x-responsive-nav-link :href="route('admin.editais.index')" :active="request()->routeIs('admin.*')">Admin</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.painel')" :active="request()->routeIs('admin.painel') || request()->routeIs('admin.editais.*')">Painel</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.inscricoes.index')" :active="request()->routeIs('admin.inscricoes.*') || request()->routeIs('admin.editais.inscricoes.*')">Inscrições</x-responsive-nav-link>
+            @else
+                <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">Dashboard</x-responsive-nav-link>
             @endif
             @if (auth()->user()->role === \App\Models\User::ROLE_ALUNO)
                 <x-responsive-nav-link :href="route('aluno.inscricoes.index')" :active="request()->routeIs('aluno.*')">Minhas inscrições</x-responsive-nav-link>

@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\AdminStoreEditalRequest;
 use App\Http\Requests\AdminUpdateEditalRequest;
 use App\Models\Edital;
+use App\Models\Inscricao;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -18,13 +20,37 @@ class EditalController extends Controller
     public function index(Request $request): View
     {
         $q = trim((string) $request->string('q')->value());
-        $mes = (int) $request->integer('mes', 0);
-        $ano = (int) $request->integer('ano', 0);
         $status = trim((string) $request->string('status')->value());
         $statusesPermitidos = ['RASCUNHO', 'AGUARDANDO', 'ABERTO', 'ENCERRADO'];
         if (! in_array($status, $statusesPermitidos, true)) {
             $status = '';
         }
+
+        $editalPadraoGraficos = Edital::query()
+            ->where('publicado', true)
+            ->where('periodo_inscricao_inicio', '<=', now())
+            ->where('periodo_inscricao_fim', '>=', now())
+            ->orderByDesc('periodo_inscricao_inicio')
+            ->first()
+            ?? Edital::query()->latest('periodo_inscricao_inicio')->first();
+
+        $graficoEditalId = (int) $request->integer('grafico_edital_id', $editalPadraoGraficos?->id ?? 0);
+        $graficoEdital = Edital::query()->find($graficoEditalId) ?? $editalPadraoGraficos;
+
+        $cardsInicio = $this->parseDate($request->string('cards_inicio')->value(), false);
+        $cardsFim = $this->parseDate($request->string('cards_fim')->value(), true);
+        if ($cardsInicio && $cardsFim && $cardsInicio->gt($cardsFim)) {
+            [$cardsInicio, $cardsFim] = [$cardsFim->copy()->startOfDay(), $cardsInicio->copy()->endOfDay()];
+        }
+
+        $graficoEditalDefaultId = (int) ($editalPadraoGraficos?->id ?? 0);
+        $graficoFiltroAlterado = $graficoEditalId !== $graficoEditalDefaultId;
+
+        $cardsFiltroAlterado =
+            ($q !== '')
+            || ($status !== '')
+            || (bool) $cardsInicio
+            || (bool) $cardsFim;
 
         $query = Edital::query()
             ->with(['documentosRequeridos:id,edital_id,tipo,ordem'])
@@ -35,18 +61,11 @@ class EditalController extends Controller
                         ->orWhere('descricao', 'like', '%'.$q.'%');
                 });
             })
-            ->when($mes >= 1 && $mes <= 12, function ($builder) use ($mes) {
-                $builder->where(function ($nested) use ($mes) {
+            ->when($cardsInicio && $cardsFim, function ($builder) use ($cardsInicio, $cardsFim) {
+                $builder->where(function ($nested) use ($cardsInicio, $cardsFim) {
                     $nested
-                        ->whereMonth('periodo_inscricao_inicio', $mes)
-                        ->orWhereMonth('periodo_inscricao_fim', $mes);
-                });
-            })
-            ->when($ano >= 2000, function ($builder) use ($ano) {
-                $builder->where(function ($nested) use ($ano) {
-                    $nested
-                        ->whereYear('periodo_inscricao_inicio', $ano)
-                        ->orWhereYear('periodo_inscricao_fim', $ano);
+                        ->where('periodo_inscricao_inicio', '<=', $cardsFim)
+                        ->where('periodo_inscricao_fim', '>=', $cardsInicio);
                 });
             })
             ->when($status !== '', function ($builder) use ($status) {
@@ -95,16 +114,121 @@ class EditalController extends Controller
             12 => 'Dezembro',
         ];
 
+        $janelaInicio = $graficoEdital?->periodo_inscricao_inicio?->copy()->startOfDay() ?? now()->startOfYear();
+        $janelaFim = $graficoEdital?->periodo_inscricao_fim?->copy()->endOfDay() ?? now()->endOfYear();
+        $serieTempoLabels = [];
+        $serieTempoData = [];
+        $graficoGranularidade = 'dia';
+
+        if ($graficoEdital) {
+            $diasIntervalo = $janelaInicio->diffInDays($janelaFim) + 1;
+            $mesesIntervalo = $janelaInicio->diffInMonths($janelaFim);
+
+            if ($mesesIntervalo > 18) {
+                $graficoGranularidade = 'ano';
+            } elseif ($diasIntervalo > 90) {
+                $graficoGranularidade = 'mes';
+            }
+
+            /** @var Collection<string,int> $countMap */
+            $countMap = Inscricao::query()
+                ->where('edital_id', $graficoEdital->id)
+                ->whereBetween('submitted_at', [$janelaInicio, $janelaFim])
+                ->selectRaw(match ($graficoGranularidade) {
+                    'ano' => "DATE_FORMAT(submitted_at, '%Y') as bucket, COUNT(*) as total",
+                    'mes' => "DATE_FORMAT(submitted_at, '%Y-%m') as bucket, COUNT(*) as total",
+                    default => "DATE(submitted_at) as bucket, COUNT(*) as total",
+                })
+                ->groupBy('bucket')
+                ->pluck('total', 'bucket');
+
+            if ($graficoGranularidade === 'ano') {
+                $cursor = $janelaInicio->copy()->startOfYear();
+                $limite = $janelaFim->copy()->endOfYear();
+                while ($cursor->lte($limite)) {
+                    $key = $cursor->format('Y');
+                    $serieTempoLabels[] = $key;
+                    $serieTempoData[] = (int) ($countMap[$key] ?? 0);
+                    $cursor->addYear();
+                }
+            } elseif ($graficoGranularidade === 'mes') {
+                $cursor = $janelaInicio->copy()->startOfMonth();
+                $limite = $janelaFim->copy()->endOfMonth();
+                while ($cursor->lte($limite)) {
+                    $key = $cursor->format('Y-m');
+                    $serieTempoLabels[] = ($meses[(int) $cursor->format('n')] ?? $cursor->format('m')).'/'.$cursor->format('Y');
+                    $serieTempoData[] = (int) ($countMap[$key] ?? 0);
+                    $cursor->addMonth();
+                }
+            } else {
+                $cursor = $janelaInicio->copy();
+                while ($cursor->lte($janelaFim)) {
+                    $key = $cursor->format('Y-m-d');
+                    $serieTempoLabels[] = $cursor->format('d/m');
+                    $serieTempoData[] = (int) ($countMap[$key] ?? 0);
+                    $cursor->addDay();
+                }
+            }
+        }
+
+        $statusCountMap = collect([
+            'HOMOLOGADA' => 0,
+            'INDEFERIDA' => 0,
+            'RECEBIDA' => 0,
+        ]);
+
+        if ($graficoEdital) {
+            $statusCountMap = Inscricao::query()
+                ->where('edital_id', $graficoEdital->id)
+                ->whereBetween('submitted_at', [$janelaInicio, $janelaFim])
+                ->selectRaw('status, COUNT(*) as total')
+                ->groupBy('status')
+                ->pluck('total', 'status')
+                ->pipe(function ($counts) use ($statusCountMap) {
+                    return $statusCountMap->mapWithKeys(function ($default, $status) use ($counts) {
+                        return [$status => (int) ($counts[$status] ?? 0)];
+                    });
+                });
+        }
+
         return view('admin.editais.index', [
             'editais' => $query->latest('periodo_inscricao_inicio')->paginate(12)->withQueryString(),
             'q' => $q,
-            'mes' => $mes,
-            'ano' => $ano,
             'status' => $status,
             'meses' => $meses,
             'anosDisponiveis' => $anosDisponiveis,
             'statusOptions' => $statusesPermitidos,
+            'graficoEditalId' => $graficoEdital?->id,
+            'cardsInicio' => $cardsInicio?->format('Y-m-d'),
+            'cardsFim' => $cardsFim?->format('Y-m-d'),
+            'graficoFiltroAlterado' => $graficoFiltroAlterado,
+            'cardsFiltroAlterado' => $cardsFiltroAlterado,
+            'graficoEditais' => Edital::query()->orderByDesc('periodo_inscricao_inicio')->get(['id', 'titulo', 'periodo_inscricao_fim']),
+            'graficoTempoLabels' => $serieTempoLabels,
+            'graficoTempoData' => $serieTempoData,
+            'graficoGranularidade' => $graficoGranularidade,
+            'graficoStatusLabels' => ['Homologado', 'Não Homologado', 'Aguardando Homologação'],
+            'graficoStatusData' => [
+                (int) ($statusCountMap['HOMOLOGADA'] ?? 0),
+                (int) ($statusCountMap['INDEFERIDA'] ?? 0),
+                (int) ($statusCountMap['RECEBIDA'] ?? 0),
+            ],
         ]);
+    }
+
+    private function parseDate(?string $value, bool $endOfDay): ?Carbon
+    {
+        if (! filled($value)) {
+            return null;
+        }
+
+        try {
+            $date = Carbon::parse($value);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $endOfDay ? $date->endOfDay() : $date->startOfDay();
     }
 
     public function create(): View

@@ -43,10 +43,12 @@ Route::prefix('admin')
     ->middleware(['auth', 'role:'.User::ROLE_ADMIN])
     ->name('admin.')
     ->group(function () {
+        Route::get('/painel', [AdminEditalController::class, 'index'])->name('painel');
+        Route::get('/inscricoes', [AdminInscricaoController::class, 'index'])->name('inscricoes.index');
         Route::resource('editais', AdminEditalController::class, ['parameters' => ['editais' => 'edital']])->except(['show']);
         Route::post('editais/{edital}/publicacao', [AdminEditalController::class, 'updatePublicacao'])->name('editais.publicacao');
 
-        Route::get('/editais/{edital}/inscricoes', [AdminInscricaoController::class, 'index'])->name('editais.inscricoes.index');
+        Route::get('/editais/{edital}/inscricoes', [AdminInscricaoController::class, 'byEdital'])->name('editais.inscricoes.index');
         Route::get('/inscricoes/{inscricao}', [AdminInscricaoController::class, 'show'])->name('inscricoes.show');
         Route::post('/inscricoes/{inscricao}/homologar', [AdminInscricaoController::class, 'homologar'])->name('inscricoes.homologar');
         Route::post('/inscricoes/{inscricao}/indeferir', [AdminInscricaoController::class, 'indeferir'])->name('inscricoes.indeferir');

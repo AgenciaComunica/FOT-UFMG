@@ -21,7 +21,42 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InscricaoController extends Controller
 {
-    public function index(Edital $edital, Request $request): View
+    public function index(Request $request): View
+    {
+        $status = $request->string('status')->value();
+        $search = $request->string('q')->value();
+        $date = $request->string('data')->value();
+        $editalId = (int) $request->integer('edital_id', 0);
+
+        $inscricoes = Inscricao::query()
+            ->with('edital')
+            ->when($editalId > 0, fn ($query) => $query->where('edital_id', $editalId))
+            ->when($status, fn ($query) => $query->where('status', $status))
+            ->when($date, fn ($query) => $query->whereDate('submitted_at', $date))
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested
+                        ->where('nome_completo', 'like', '%'.$search.'%')
+                        ->orWhere('protocolo', 'like', '%'.$search.'%')
+                        ->orWhere('email', 'like', '%'.$search.'%')
+                        ->orWhere('cpf', 'like', '%'.$search.'%');
+                });
+            })
+            ->latest('submitted_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('admin.inscricoes.global', [
+            'inscricoes' => $inscricoes,
+            'status' => $status,
+            'search' => $search,
+            'date' => $date,
+            'editalId' => $editalId,
+            'editais' => Edital::query()->orderByDesc('periodo_inscricao_inicio')->get(['id', 'titulo']),
+        ]);
+    }
+
+    public function byEdital(Edital $edital, Request $request): View
     {
         $status = $request->string('status')->value();
         $search = $request->string('q')->value();

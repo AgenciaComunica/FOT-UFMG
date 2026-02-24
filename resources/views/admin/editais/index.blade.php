@@ -1,8 +1,8 @@
 <x-app-layout>
     <x-slot name="header">
         <div>
-            <h2 class="text-xl font-bold text-slate-900">Editais</h2>
-            <p class="text-sm text-slate-500">Gerencie todos os editais do processo seletivo.</p>
+            <h2 class="text-xl font-bold text-slate-900">Painel</h2>
+            <p class="text-sm text-slate-500">Visão geral dos editais e comportamento das inscrições.</p>
         </div>
     </x-slot>
 
@@ -15,10 +15,62 @@
             <div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first('edital') }}</div>
         @endif
 
+        <form
+            method="GET"
+            class="panel-card grid gap-3 md:grid-cols-2 md:items-end"
+            x-ref="graficoForm"
+        >
+            <input type="hidden" name="q" value="{{ $q }}">
+            <input type="hidden" name="status" value="{{ $status }}">
+            <input type="hidden" name="cards_inicio" value="{{ $cardsInicio }}">
+            <input type="hidden" name="cards_fim" value="{{ $cardsFim }}">
+
+            <div>
+                <x-input-label for="grafico_edital_id" value="Edital (gráficos)" />
+                <select id="grafico_edital_id" name="grafico_edital_id" class="input-base" @change="$refs.graficoForm.submit()">
+                    @foreach ($graficoEditais as $editalGrafico)
+                        <option value="{{ $editalGrafico->id }}" @selected($graficoEditalId === $editalGrafico->id)>{{ $editalGrafico->titulo }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            @if ($graficoFiltroAlterado)
+                <div class="flex items-end">
+                    <a href="{{ route('admin.painel') }}" class="btn-muted">Limpar filtro</a>
+                </div>
+            @endif
+        </form>
+
+        <div class="grid gap-4 lg:grid-cols-3">
+            <section class="panel-card lg:col-span-2">
+                <div class="mb-3">
+                    <h3 class="text-base font-semibold text-slate-900">
+                        Curva de inscrições ({{ optional($graficoEditais->firstWhere('id', $graficoEditalId))->titulo ?? 'Edital selecionado' }})
+                    </h3>
+                    <p class="text-xs text-slate-500">
+                        A curva considera o período selecionado no filtro acima
+                        (escala: {{ $graficoGranularidade === 'ano' ? 'anual' : ($graficoGranularidade === 'mes' ? 'mensal' : 'diária') }}).
+                    </p>
+                </div>
+                <div id="chart-inscricoes-tempo" class="min-h-[280px]"></div>
+            </section>
+
+            <section class="panel-card lg:col-span-1">
+                <div class="mb-3">
+                    <h3 class="text-base font-semibold text-slate-900">Proporção por status de inscrição</h3>
+                </div>
+                <div id="chart-inscricoes-status" class="min-h-[280px]"></div>
+            </section>
+        </div>
+
         <div class="flex flex-wrap items-start justify-between gap-3">
-            <form method="GET" x-data="{ timer: null }" class="w-full space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" x-ref="filterForm">
+            <form method="GET" x-data="rangeCardsFilter(@js($cardsInicio), @js($cardsFim))" class="w-full space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" x-ref="filterForm">
+                <input type="hidden" name="grafico_edital_id" value="{{ $graficoEditalId }}">
+                <input type="hidden" name="cards_inicio" x-model="startDate">
+                <input type="hidden" name="cards_fim" x-model="endDate">
+
                 <div class="md:flex md:items-end md:gap-3">
-                    <div class="grid flex-1 gap-3 md:grid-cols-4">
+                    <div class="grid flex-1 gap-3 md:grid-cols-3">
                         <div>
                             <x-input-label for="q" value="Pesquisar edital" />
                             <x-text-input
@@ -32,23 +84,8 @@
                             />
                         </div>
                         <div>
-                            <x-input-label for="mes" value="Mês" />
-                            <select id="mes" name="mes" class="input-base" @change="$refs.filterForm.submit()">
-                                <option value="">Todos</option>
-                                @foreach ($meses as $numero => $nome)
-                                    <option value="{{ $numero }}" @selected($mes === $numero)>{{ $nome }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div>
-                            <x-input-label for="ano" value="Ano" />
-                            <select id="ano" name="ano" class="input-base" @change="$refs.filterForm.submit()">
-                                <option value="">Todos</option>
-                                @foreach ($anosDisponiveis as $anoOpcao)
-                                    <option value="{{ $anoOpcao }}" @selected($ano === (int) $anoOpcao)>{{ $anoOpcao }}</option>
-                                @endforeach
-                            </select>
+                            <x-input-label value="Filtro período" />
+                            <input type="text" x-ref="range" class="input-base" readonly>
                         </div>
                         <div>
                             <x-input-label for="status" value="Status" />
@@ -62,15 +99,14 @@
                     </div>
 
                     <div class="mt-3 flex items-end justify-end md:mt-0 md:pb-[2px]">
-                        <a href="{{ route('admin.editais.create') }}" class="btn-primary whitespace-nowrap">+ Novo Edital</a>
+                        <div class="flex gap-2">
+                            @if ($cardsFiltroAlterado)
+                                <a href="{{ route('admin.painel', ['grafico_edital_id' => $graficoEditalId, 'grafico_inicio' => $graficoInicio, 'grafico_fim' => $graficoFim]) }}" class="btn-muted whitespace-nowrap">Limpar filtro</a>
+                            @endif
+                            <a href="{{ route('admin.editais.create') }}" class="btn-primary whitespace-nowrap">+ Novo Edital</a>
+                        </div>
                     </div>
                 </div>
-
-                @if ($q !== '' || $mes !== 0 || $ano !== 0 || $status !== '')
-                    <div>
-                        <a href="{{ route('admin.editais.index') }}" class="btn-muted">Limpar filtros</a>
-                    </div>
-                @endif
             </form>
         </div>
 
@@ -142,7 +178,7 @@
 
                         <div class="mt-5 flex items-center gap-2 text-sm">
                             <a
-                                href="{{ route('admin.editais.inscricoes.index', $edital) }}"
+                                href="{{ route('admin.inscricoes.index', ['edital_id' => $edital->id]) }}"
                                 class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 transition hover:bg-blue-100"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -215,7 +251,52 @@
         </div>
     </div>
 
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script>
+        function rangeCardsFilter(initialStart, initialEnd) {
+            return {
+                timer: null,
+                startDate: initialStart || '',
+                endDate: initialEnd || '',
+                init() {
+                    if (typeof flatpickr === 'undefined') {
+                        return;
+                    }
+
+                    const defaultDate = [];
+                    if (this.startDate) defaultDate.push(this.startDate);
+                    if (this.endDate) defaultDate.push(this.endDate);
+
+                    flatpickr(this.$refs.range, {
+                        mode: 'range',
+                        dateFormat: 'Y-m-d',
+                        defaultDate,
+                        locale: (flatpickr.l10ns && flatpickr.l10ns.pt) ? flatpickr.l10ns.pt : undefined,
+                        onReady: (_, __, instance) => {
+                            instance.input.value = this.formatLabel(this.startDate, this.endDate);
+                        },
+                        onClose: (selectedDates, dateStr, instance) => {
+                            if (selectedDates.length === 2) {
+                                this.startDate = instance.formatDate(selectedDates[0], 'Y-m-d');
+                                this.endDate = instance.formatDate(selectedDates[1], 'Y-m-d');
+                                instance.input.value = this.formatLabel(this.startDate, this.endDate);
+                                this.$nextTick(() => this.$refs.filterForm.submit());
+                            }
+                        },
+                    });
+                },
+                formatLabel(start, end) {
+                    if (!start || !end) return 'Selecione um período';
+                    const [sy, sm, sd] = start.split('-');
+                    const [ey, em, ed] = end.split('-');
+                    return `${sd}/${sm}/${sy} até ${ed}/${em}/${ey}`;
+                },
+            };
+        }
+
         function deleteEditalModal() {
             return {
                 open: false,
@@ -246,5 +327,91 @@
                 },
             };
         }
+
+        (() => {
+            const tempoCtx = document.getElementById('chart-inscricoes-tempo');
+            const statusCtx = document.getElementById('chart-inscricoes-status');
+            if (!tempoCtx || !statusCtx || typeof ApexCharts === 'undefined') {
+                return;
+            }
+
+            const tempoOptions = {
+                chart: {
+                    type: 'area',
+                    height: 280,
+                    toolbar: { show: false },
+                    zoom: { enabled: false },
+                    fontFamily: 'Manrope, sans-serif',
+                },
+                series: [{
+                    name: 'Inscrições',
+                    data: @json($graficoTempoData),
+                }],
+                xaxis: {
+                    categories: @json($graficoTempoLabels),
+                    labels: { rotate: -35, trim: true },
+                    tickPlacement: 'between',
+                },
+                yaxis: {
+                    min: 0,
+                    forceNiceScale: true,
+                    decimalsInFloat: 0,
+                    labels: {
+                        formatter: function (val) { return Math.round(val); },
+                    },
+                },
+                stroke: {
+                    curve: 'smooth',
+                    width: 3,
+                },
+                fill: {
+                    type: 'gradient',
+                    gradient: {
+                        shadeIntensity: 0.4,
+                        opacityFrom: 0.45,
+                        opacityTo: 0.06,
+                    },
+                },
+                colors: ['#2565aa'],
+                dataLabels: { enabled: false },
+                tooltip: {
+                    y: {
+                        formatter: function (val) { return `${Math.round(val)} inscrição(ões)`; },
+                    },
+                },
+                grid: {
+                    borderColor: '#e2e8f0',
+                    padding: {
+                        left: 8,
+                        right: 18,
+                    },
+                },
+            };
+
+            new ApexCharts(tempoCtx, tempoOptions).render();
+
+            const statusOptions = {
+                chart: {
+                    type: 'pie',
+                    height: 280,
+                    toolbar: { show: false },
+                    fontFamily: 'Manrope, sans-serif',
+                },
+                labels: @json($graficoStatusLabels),
+                series: @json($graficoStatusData),
+                colors: ['#16a34a', '#dc2626', '#2563eb'],
+                dataLabels: { enabled: true },
+                tooltip: {
+                    y: {
+                        formatter: function (val) { return `${Math.round(val)} inscrição(ões)`; },
+                    },
+                },
+                legend: {
+                    position: 'bottom',
+                },
+            };
+
+            new ApexCharts(statusCtx, statusOptions).render();
+        })();
     </script>
 </x-app-layout>

@@ -126,6 +126,6 @@
             </div>
         @endif
 
-        <a href="{{ route('admin.editais.inscricoes.index', $inscricao->edital) }}" class="text-sm font-semibold text-blue-600 hover:underline">Voltar para listagem</a>
+        <a href="{{ route('admin.inscricoes.index', ['edital_id' => $inscricao->edital_id]) }}" class="text-sm font-semibold text-blue-600 hover:underline">Voltar para listagem</a>
     </div>
 </x-app-layout>
