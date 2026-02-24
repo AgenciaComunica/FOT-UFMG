@@ -204,7 +204,6 @@
                     <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <h2 class="text-base font-bold text-slate-900">Verificar inscrição</h2>
                         <p class="mt-1 text-xs text-slate-500">Informe protocolo, e-mail ou CPF para localizar sua inscrição.</p>
-                        <p class="mt-1 text-xs text-amber-700">Se houver erro de CPF ou e-mail, entre em contato com a secretaria com urgência.</p>
                         <form method="POST" action="{{ route('public.inscricoes.verificar') }}" class="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
                             @csrf
                             <input type="text" name="{{ $honeypotField }}" class="hidden" tabindex="-1" autocomplete="off">
@@ -260,6 +259,12 @@
                                     @endforeach
                                 </div>
                             @endif
+                        </div>
+                        <div class="rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-800">
+                            <span class="inline-flex items-center rounded-full border border-amber-400 bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide">
+                                Atenção
+                            </span>
+                            <p class="mt-2 text-sm font-medium">Se houver erro de CPF ou e-mail, entre em contato com a secretaria com urgência.</p>
                         </div>
                     @endif
                 </div>

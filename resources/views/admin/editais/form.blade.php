@@ -35,6 +35,8 @@
             @if ($method !== 'POST')
                 @method($method)
             @endif
+            <input type="hidden" name="submit_action" x-ref="submitAction" value="{{ old('submit_action', 'publish') }}">
+            <input type="hidden" name="goto_new_docente" x-ref="gotoNewDocente" value="0">
 
             <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <div class="flex items-center justify-between gap-3">
@@ -55,7 +57,7 @@
             <div class="grid gap-4 md:grid-cols-2">
                 <div class="md:col-span-2">
                     <x-input-label for="titulo" value="Título" />
-                    <x-text-input id="titulo" name="titulo" type="text" class="input-base" :value="old('titulo', $edital->titulo)" x-ref="titulo" required />
+                    <x-text-input id="titulo" name="titulo" type="text" class="input-base" :value="old('titulo', $edital->titulo)" x-ref="titulo" x-bind:required="publicado" />
                 </div>
 
                 <div class="md:col-span-2">
@@ -65,12 +67,12 @@
 
                 <div>
                     <x-input-label for="periodo_inscricao_inicio" value="Início inscrição" />
-                    <x-text-input id="periodo_inscricao_inicio" name="periodo_inscricao_inicio" type="datetime-local" class="input-base" :value="old('periodo_inscricao_inicio', optional($edital->periodo_inscricao_inicio)->format('Y-m-d\TH:i'))" x-ref="inicio" required />
+                    <x-text-input id="periodo_inscricao_inicio" name="periodo_inscricao_inicio" type="datetime-local" class="input-base" :value="old('periodo_inscricao_inicio', optional($edital->periodo_inscricao_inicio)->format('Y-m-d\TH:i'))" x-ref="inicio" x-bind:required="publicado" />
                 </div>
 
                 <div>
                     <x-input-label for="periodo_inscricao_fim" value="Fim inscrição" />
-                    <x-text-input id="periodo_inscricao_fim" name="periodo_inscricao_fim" type="datetime-local" class="input-base" :value="old('periodo_inscricao_fim', optional($edital->periodo_inscricao_fim)->format('Y-m-d\TH:i'))" x-ref="fim" required />
+                    <x-text-input id="periodo_inscricao_fim" name="periodo_inscricao_fim" type="datetime-local" class="input-base" :value="old('periodo_inscricao_fim', optional($edital->periodo_inscricao_fim)->format('Y-m-d\TH:i'))" x-ref="fim" x-bind:required="publicado" />
                 </div>
 
                 <div class="md:col-span-2">
@@ -166,8 +168,9 @@
                             <div class="space-y-3">
                                 <div>
                                     <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Selecionar docente</label>
-                                    <select :name="`banca_docentes[${index}][user_id]`" x-model="bancaDocentes[index].user_id" class="input-base mt-1">
+                                    <select :name="`banca_docentes[${index}][user_id]`" x-model="bancaDocentes[index].user_id" @change="handleDocenteSelection(index)" class="input-base mt-1">
                                         <option value="">Selecione</option>
+                                        <option value="__new_docente__">+ Novo Docente</option>
                                         <template x-for="docente in availableDocentes(index)" :key="`opt-${index}-${docente.id}`">
                                             <option :value="String(docente.id)" x-text="`${docente.name} (${docente.email})${docente.ativo ? '' : ' - Inativo'}`"></option>
                                         </template>
@@ -284,6 +287,7 @@
 
             <div class="flex flex-wrap gap-3">
                 <button type="button" class="btn-primary" x-text="primaryActionLabel()" @click="handlePrimaryAction()"></button>
+                <button type="button" class="btn-muted" @click="handleDraftAction()">Salvar como Rascunho</button>
                 @if ($edital->exists)
                     <button type="button" class="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700" @click="deleteNameConfirm = ''; confirmDeleteOpen = true">Excluir edital</button>
                 @endif
@@ -506,6 +510,8 @@
                     return this.isEdit ? 'Salvar Edições' : 'Publicar Edital';
                 },
                 handlePrimaryAction() {
+                    this.$refs.submitAction.value = 'publish';
+                    this.$refs.gotoNewDocente.value = '0';
                     if (!this.publicado) {
                         const missing = this.requiredForPublishMissing();
                         if (missing.length > 0) {
@@ -517,6 +523,26 @@
                         this.publicado = true;
                     }
 
+                    this.$nextTick(() => {
+                        this.$root.submit();
+                    });
+                },
+                handleDraftAction() {
+                    this.publicado = false;
+                    this.$refs.submitAction.value = 'draft';
+                    this.$refs.gotoNewDocente.value = '0';
+                    this.$nextTick(() => {
+                        this.$root.submit();
+                    });
+                },
+                handleDocenteSelection(index) {
+                    if (this.bancaDocentes[index]?.user_id !== '__new_docente__') {
+                        return;
+                    }
+                    this.bancaDocentes[index].user_id = '';
+                    this.publicado = false;
+                    this.$refs.submitAction.value = 'draft';
+                    this.$refs.gotoNewDocente.value = '1';
                     this.$nextTick(() => {
                         this.$root.submit();
                     });

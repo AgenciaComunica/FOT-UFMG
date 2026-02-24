@@ -266,17 +266,22 @@ class EditalController extends Controller
     public function store(AdminStoreEditalRequest $request): RedirectResponse
     {
         $data = $request->validated();
+        $isDraft = $request->input('submit_action') === 'draft';
+        $publicado = $isDraft ? false : (bool) ($data['publicado'] ?? false);
+        $gotoNewDocente = $request->boolean('goto_new_docente');
+        $inicio = $this->resolveDateTimeForPersist($data['periodo_inscricao_inicio'] ?? null, false);
+        $fim = $this->resolveDateTimeForPersist($data['periodo_inscricao_fim'] ?? null, true);
 
         $edital = Edital::create([
-            'titulo' => $data['titulo'],
+            'titulo' => $this->resolveTituloForPersist($data['titulo'] ?? null),
             'descricao' => $data['descricao'] ?? null,
-            'publicado' => (bool) ($data['publicado'] ?? false),
-            'criterio_nota_corte' => $data['criterio_nota_corte'],
-            'nota_corte_fixa' => $data['criterio_nota_corte'] === Edital::CORTE_FIXA ? (float) $data['nota_corte_fixa'] : null,
-            'nota_corte_offset' => $data['criterio_nota_corte'] === Edital::CORTE_MEDIA_FLUTUANTE ? (float) $data['nota_corte_offset'] : null,
-            'numero_vagas' => $data['criterio_nota_corte'] === Edital::CORTE_NUMERO_VAGAS ? (int) $data['numero_vagas'] : null,
-            'periodo_inscricao_inicio' => $this->normalizeDateTime($data['periodo_inscricao_inicio'], false),
-            'periodo_inscricao_fim' => $this->normalizeDateTime($data['periodo_inscricao_fim'], true),
+            'publicado' => $publicado,
+            'criterio_nota_corte' => $data['criterio_nota_corte'] ?? Edital::CORTE_APROVACAO_MANUAL,
+            'nota_corte_fixa' => ($data['criterio_nota_corte'] ?? null) === Edital::CORTE_FIXA ? (float) ($data['nota_corte_fixa'] ?? 0) : null,
+            'nota_corte_offset' => ($data['criterio_nota_corte'] ?? null) === Edital::CORTE_MEDIA_FLUTUANTE ? (float) ($data['nota_corte_offset'] ?? 0) : null,
+            'numero_vagas' => ($data['criterio_nota_corte'] ?? null) === Edital::CORTE_NUMERO_VAGAS ? (int) ($data['numero_vagas'] ?? 0) : null,
+            'periodo_inscricao_inicio' => $inicio,
+            'periodo_inscricao_fim' => $fim->lt($inicio) ? $inicio->copy()->endOfDay() : $fim,
         ]);
 
         if ($request->hasFile('arquivo_edital')) {
@@ -297,13 +302,19 @@ class EditalController extends Controller
 
         $this->syncDocumentosRequeridos($edital, $data['documentos_requeridos'] ?? []);
         $this->syncBancaDocentes($edital, $data['banca_docentes'] ?? []);
-        if ($edital->publicado) {
+        if ($publicado) {
             $this->notificarDocentesBancaPublicacao($edital);
+        }
+
+        if ($gotoNewDocente) {
+            return redirect()
+                ->route('admin.docentes.create', ['return_to' => route('admin.editais.edit', $edital)])
+                ->with('status', 'Rascunho salvo. Cadastre o novo docente para voltar ao edital.');
         }
 
         return redirect()
             ->route('admin.editais.index')
-            ->with('status', 'Edital criado com sucesso.');
+            ->with('status', $publicado ? 'Edital criado com sucesso.' : 'Rascunho salvo com sucesso.');
     }
 
     public function edit(Edital $edital): View
@@ -343,17 +354,22 @@ class EditalController extends Controller
     {
         $data = $request->validated();
         $wasPublicado = (bool) $edital->publicado;
+        $isDraft = $request->input('submit_action') === 'draft';
+        $publicado = $isDraft ? false : (bool) ($data['publicado'] ?? false);
+        $gotoNewDocente = $request->boolean('goto_new_docente');
+        $inicio = $this->resolveDateTimeForPersist($data['periodo_inscricao_inicio'] ?? null, false, $edital->periodo_inscricao_inicio);
+        $fim = $this->resolveDateTimeForPersist($data['periodo_inscricao_fim'] ?? null, true, $edital->periodo_inscricao_fim);
 
         $edital->update([
-            'titulo' => $data['titulo'],
+            'titulo' => $this->resolveTituloForPersist($data['titulo'] ?? null, $edital->titulo),
             'descricao' => $data['descricao'] ?? null,
-            'publicado' => (bool) ($data['publicado'] ?? false),
-            'criterio_nota_corte' => $data['criterio_nota_corte'],
-            'nota_corte_fixa' => $data['criterio_nota_corte'] === Edital::CORTE_FIXA ? (float) $data['nota_corte_fixa'] : null,
-            'nota_corte_offset' => $data['criterio_nota_corte'] === Edital::CORTE_MEDIA_FLUTUANTE ? (float) $data['nota_corte_offset'] : null,
-            'numero_vagas' => $data['criterio_nota_corte'] === Edital::CORTE_NUMERO_VAGAS ? (int) $data['numero_vagas'] : null,
-            'periodo_inscricao_inicio' => $this->normalizeDateTime($data['periodo_inscricao_inicio'], false),
-            'periodo_inscricao_fim' => $this->normalizeDateTime($data['periodo_inscricao_fim'], true),
+            'publicado' => $publicado,
+            'criterio_nota_corte' => $data['criterio_nota_corte'] ?? $edital->criterio_nota_corte ?? Edital::CORTE_APROVACAO_MANUAL,
+            'nota_corte_fixa' => ($data['criterio_nota_corte'] ?? $edital->criterio_nota_corte) === Edital::CORTE_FIXA ? (float) ($data['nota_corte_fixa'] ?? $edital->nota_corte_fixa ?? 0) : null,
+            'nota_corte_offset' => ($data['criterio_nota_corte'] ?? $edital->criterio_nota_corte) === Edital::CORTE_MEDIA_FLUTUANTE ? (float) ($data['nota_corte_offset'] ?? $edital->nota_corte_offset ?? 0) : null,
+            'numero_vagas' => ($data['criterio_nota_corte'] ?? $edital->criterio_nota_corte) === Edital::CORTE_NUMERO_VAGAS ? (int) ($data['numero_vagas'] ?? $edital->numero_vagas ?? 0) : null,
+            'periodo_inscricao_inicio' => $inicio,
+            'periodo_inscricao_fim' => $fim->lt($inicio) ? $inicio->copy()->endOfDay() : $fim,
         ]);
 
         if ($request->hasFile('arquivo_edital')) {
@@ -382,9 +398,15 @@ class EditalController extends Controller
             $this->notificarDocentesBancaPublicacao($edital);
         }
 
+        if ($gotoNewDocente) {
+            return redirect()
+                ->route('admin.docentes.create', ['return_to' => route('admin.editais.edit', $edital)])
+                ->with('status', 'Rascunho salvo. Cadastre o novo docente para voltar ao edital.');
+        }
+
         return redirect()
             ->route('admin.editais.index')
-            ->with('status', 'Edital atualizado com sucesso.');
+            ->with('status', $publicado ? 'Edital atualizado com sucesso.' : 'Rascunho salvo com sucesso.');
     }
 
     public function destroy(Edital $edital): RedirectResponse
@@ -445,6 +467,33 @@ class EditalController extends Controller
         }
 
         return $date;
+    }
+
+    private function resolveTituloForPersist(?string $titulo, ?string $fallback = null): string
+    {
+        $tituloNormalizado = trim((string) $titulo);
+        if ($tituloNormalizado !== '') {
+            return $tituloNormalizado;
+        }
+
+        if (filled($fallback)) {
+            return trim((string) $fallback);
+        }
+
+        return 'Rascunho '.now()->format('d/m/Y H:i');
+    }
+
+    private function resolveDateTimeForPersist(?string $value, bool $endOfDay, ?Carbon $fallback = null): Carbon
+    {
+        if (filled($value)) {
+            return $this->normalizeDateTime((string) $value, $endOfDay);
+        }
+
+        if ($fallback instanceof Carbon) {
+            return $fallback->copy();
+        }
+
+        return $endOfDay ? now()->endOfDay() : now();
     }
 
     /**

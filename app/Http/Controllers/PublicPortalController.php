@@ -109,9 +109,9 @@ class PublicPortalController extends Controller
             return [
                 'id' => $inscricao->id,
                 'protocolo' => $inscricao->protocolo,
-                'nome_completo' => $inscricao->nome_completo,
-                'email' => $inscricao->email,
-                'cpf' => $inscricao->cpf,
+                'nome_completo' => $this->maskNome($inscricao->nome_completo),
+                'email' => $this->maskEmail($inscricao->email),
+                'cpf' => $this->maskCpf($inscricao->cpf),
                 'status' => $this->statusPublico($inscricao->status),
                 'email_verificado' => $inscricao->email_verified_at !== null,
                 'resend_key' => hash_hmac('sha256', $inscricao->id.'|'.$inscricao->email, (string) config('app.key')),
@@ -168,5 +168,55 @@ class PublicPortalController extends Controller
             Inscricao::STATUS_INDEFERIDA => 'Indeferida',
             default => 'Em análise',
         };
+    }
+
+    private function maskEmail(?string $email): string
+    {
+        $email = trim((string) $email);
+        if ($email === '' || ! str_contains($email, '@')) {
+            return '-';
+        }
+
+        [$local, $domain] = explode('@', $email, 2);
+        $localLen = mb_strlen($local);
+
+        if ($localLen <= 2) {
+            $maskedLocal = mb_substr($local, 0, 1).'*';
+        } else {
+            $maskedLocal = mb_substr($local, 0, 2).str_repeat('*', max(3, $localLen - 2));
+        }
+
+        return $maskedLocal.'@'.$domain;
+    }
+
+    private function maskCpf(?string $cpf): string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $cpf) ?: '';
+        if ($digits === '') {
+            return '-';
+        }
+
+        $tail = substr($digits, -3);
+
+        return '***.***.***-'.$tail;
+    }
+
+    private function maskNome(?string $nome): string
+    {
+        $nome = trim((string) $nome);
+        if ($nome === '') {
+            return '-';
+        }
+
+        $partes = preg_split('/\s+/', $nome) ?: [];
+        if (count($partes) === 1) {
+            $primeiro = $partes[0];
+            return mb_substr($primeiro, 0, 1).str_repeat('*', max(2, mb_strlen($primeiro) - 1));
+        }
+
+        $primeiro = $partes[0];
+        $ultimo = $partes[count($partes) - 1];
+
+        return $primeiro.' '.mb_substr($ultimo, 0, 1).'.';
     }
 }

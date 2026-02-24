@@ -5,7 +5,7 @@
                 <h2 class="text-xl font-bold text-slate-900">{{ $isEdit ? 'Editar docente' : 'Novo docente' }}</h2>
                 <p class="text-sm text-slate-500">Cadastro de acesso para docentes avaliadores.</p>
             </div>
-            <a href="{{ route('admin.docentes.index') }}" class="btn-muted">Voltar para Docentes</a>
+            <a href="{{ $returnTo ?: route('admin.docentes.index') }}" class="btn-muted">Voltar para Docentes</a>
         </div>
     </x-slot>
 
@@ -15,6 +15,7 @@
             @if ($method !== 'POST')
                 @method($method)
             @endif
+            <input type="hidden" name="return_to" value="{{ $returnTo }}">
 
             <div class="grid gap-4 md:grid-cols-2">
                 <div class="md:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-4" x-data="{ ativo: {{ old('ativo', $docente->exists ? (int) $docente->ativo : 1) ? 'true' : 'false' }} }">
@@ -62,7 +63,7 @@
             </div>
 
             <div class="flex items-center justify-end gap-2">
-                <a href="{{ route('admin.docentes.index') }}" class="btn-muted">Cancelar</a>
+                <a href="{{ $returnTo ?: route('admin.docentes.index') }}" class="btn-muted">Cancelar</a>
                 <x-primary-button>{{ $isEdit ? 'Salvar alterações' : 'Cadastrar docente' }}</x-primary-button>
             </div>
         </form>

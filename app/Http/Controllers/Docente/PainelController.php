@@ -29,12 +29,27 @@ class PainelController extends Controller
                 ->where('users.id', $user->id)
                 ->where('edital_docentes.aprovador', true))
             ->exists();
-        $tab = strtolower(trim((string) $request->string('tab', 'pendente')->value()));
+        $hasPendente = Inscricao::query()
+            ->whereIn('status', [
+                Inscricao::STATUS_RECEBIDA,
+                Inscricao::STATUS_PRE_APROVADA,
+                Inscricao::STATUS_PRE_INDEFERIDA,
+            ])
+            ->whereNotNull('email_verified_at')
+            ->whereHas('edital.docentesBanca', fn ($q) => $q->where('users.id', $user->id))
+            ->where(function ($sub) use ($user) {
+                $sub->whereDoesntHave('avaliacoes', fn ($s) => $s->where('docente_id', $user->id))
+                    ->orWhereHas('avaliacoes', fn ($s) => $s->where('docente_id', $user->id)->whereNull('nota'));
+            })
+            ->exists();
+
+        $defaultTab = (! $hasPendente && $hasAprovadorAny) ? 'aprovacao' : 'pendente';
+        $tab = strtolower(trim((string) $request->string('tab', $defaultTab)->value()));
         if (! in_array($tab, ['pendente', 'avaliado', 'aprovacao'], true)) {
-            $tab = 'pendente';
+            $tab = $defaultTab;
         }
         if ($tab === 'aprovacao' && ! $hasAprovadorAny) {
-            $tab = 'pendente';
+            $tab = $defaultTab;
         }
         $search = trim((string) $request->string('q')->value());
         $finalStatus = trim((string) $request->string('final_status')->value());

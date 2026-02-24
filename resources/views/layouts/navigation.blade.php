@@ -1,12 +1,15 @@
-<nav x-data="{ open: false }" class="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-    <div class="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+<nav x-data="{ open: false }" class="sticky top-0 z-40 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+    <div class="mx-auto flex h-20 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div class="flex items-center gap-6">
-            <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
+            <a href="{{ route('dashboard') }}" class="group flex items-center gap-3 rounded-xl px-2 py-1 transition hover:bg-slate-50">
                 <img src="{{ asset('images/Icone-FTO.png') }}" alt="Logo FOT-UFMG" class="h-9 w-9 rounded-lg object-cover">
-                <span class="hidden text-sm font-semibold text-slate-800 md:inline">Secretaria Fisioterapia</span>
+                <div class="hidden leading-tight md:block">
+                    <p class="text-sm font-semibold text-slate-800">FOT-UFMG</p>
+                    <p class="text-xs text-slate-500">Secretaria Fisioterapia</p>
+                </div>
             </a>
 
-            <div class="hidden items-center gap-2 md:flex">
+            <div class="hidden items-center gap-2 rounded-2xl border border-slate-200 bg-white p-1 md:flex">
                 @if (auth()->user()->role === \App\Models\User::ROLE_ADMIN)
                     <x-nav-link :href="route('admin.painel')" :active="request()->routeIs('admin.painel') || request()->routeIs('admin.editais.*')">Painel</x-nav-link>
                     <x-nav-link :href="route('admin.inscricoes.index')" :active="request()->routeIs('admin.inscricoes.*') || request()->routeIs('admin.editais.inscricoes.*')">Inscrições</x-nav-link>
@@ -48,7 +51,7 @@
     </div>
 
     <div x-show="open" x-transition class="border-t border-slate-200 bg-white px-4 py-3 md:hidden">
-        <div class="space-y-1">
+        <div class="space-y-2">
             @if (auth()->user()->role === \App\Models\User::ROLE_ADMIN)
                 <x-responsive-nav-link :href="route('admin.painel')" :active="request()->routeIs('admin.painel') || request()->routeIs('admin.editais.*')">Painel</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.inscricoes.index')" :active="request()->routeIs('admin.inscricoes.*') || request()->routeIs('admin.editais.inscricoes.*')">Inscrições</x-responsive-nav-link>

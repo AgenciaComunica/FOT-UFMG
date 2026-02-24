@@ -59,17 +59,21 @@ class DocenteController extends Controller
 
     public function create(): View
     {
+        $returnTo = $this->resolveReturnTo(request('return_to'));
+
         return view('admin.docentes.form', [
             'docente' => new User(),
             'formAction' => route('admin.docentes.store'),
             'method' => 'POST',
             'isEdit' => false,
+            'returnTo' => $returnTo,
         ]);
     }
 
     public function store(AdminStoreDocenteRequest $request): RedirectResponse
     {
         $data = $request->validated();
+        $returnTo = $this->resolveReturnTo($request->input('return_to'));
         $senhaTemporaria = Str::password(12);
 
         $docente = User::query()->create([
@@ -95,22 +99,26 @@ class DocenteController extends Controller
 
         $resetSent = Password::sendResetLink(['email' => $data['email']]) === Password::RESET_LINK_SENT;
 
-        return redirect()
-            ->route('admin.docentes.index')
-            ->with('status', $resetSent
-                ? 'Docente cadastrado com sucesso. Credenciais iniciais e link de redefinição enviados por e-mail.'
-                : 'Docente cadastrado com sucesso. Credenciais iniciais enviadas; não foi possível enviar o link de redefinição.');
+        $message = $resetSent
+            ? 'Docente cadastrado com sucesso. Credenciais iniciais e link de redefinição enviados por e-mail.'
+            : 'Docente cadastrado com sucesso. Credenciais iniciais enviadas; não foi possível enviar o link de redefinição.';
+
+        return $returnTo
+            ? redirect()->to($returnTo)->with('status', $message)
+            : redirect()->route('admin.docentes.index')->with('status', $message);
     }
 
     public function edit(User $docente): View
     {
         abort_unless($docente->role === User::ROLE_DOCENTE, 404);
+        $returnTo = $this->resolveReturnTo(request('return_to'));
 
         return view('admin.docentes.form', [
             'docente' => $docente,
             'formAction' => route('admin.docentes.update', $docente),
             'method' => 'PUT',
             'isEdit' => true,
+            'returnTo' => $returnTo,
         ]);
     }
 
@@ -119,6 +127,7 @@ class DocenteController extends Controller
         abort_unless($docente->role === User::ROLE_DOCENTE, 404);
 
         $data = $request->validated();
+        $returnTo = $this->resolveReturnTo($request->input('return_to'));
 
         $payload = [
             'name' => $data['name'],
@@ -129,9 +138,49 @@ class DocenteController extends Controller
 
         $docente->update($payload);
 
-        return redirect()
-            ->route('admin.docentes.index')
-            ->with('status', 'Docente atualizado com sucesso.');
+        return $returnTo
+            ? redirect()->to($returnTo)->with('status', 'Docente atualizado com sucesso.')
+            : redirect()->route('admin.docentes.index')->with('status', 'Docente atualizado com sucesso.');
+    }
+
+    private function resolveReturnTo(?string $returnTo): ?string
+    {
+        $returnTo = trim((string) $returnTo);
+        if ($returnTo === '') {
+            return null;
+        }
+
+        if (str_starts_with($returnTo, '/admin/')) {
+            return $returnTo;
+        }
+
+        $parts = parse_url($returnTo);
+        if (! is_array($parts)) {
+            return null;
+        }
+
+        $path = (string) ($parts['path'] ?? '');
+        if (! str_starts_with($path, '/admin/')) {
+            return null;
+        }
+
+        $host = (string) ($parts['host'] ?? '');
+        $appHost = (string) parse_url((string) config('app.url'), PHP_URL_HOST);
+        $requestHost = request()->getHost();
+
+        $isLocalPair = in_array($host, ['127.0.0.1', 'localhost'], true)
+            && in_array($requestHost, ['127.0.0.1', 'localhost'], true);
+
+        if ($host !== '' && ! $isLocalPair && $host !== $appHost && $host !== $requestHost) {
+            return null;
+        }
+
+        $query = (string) ($parts['query'] ?? '');
+        $fragment = (string) ($parts['fragment'] ?? '');
+
+        return $path
+            .($query !== '' ? '?'.$query : '')
+            .($fragment !== '' ? '#'.$fragment : '');
     }
 
     public function updateStatus(Request $request, User $docente): RedirectResponse

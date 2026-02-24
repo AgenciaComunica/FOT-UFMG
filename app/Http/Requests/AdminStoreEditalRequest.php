@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use App\Models\User;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class AdminStoreEditalRequest extends FormRequest
@@ -15,17 +16,21 @@ class AdminStoreEditalRequest extends FormRequest
 
     public function rules(): array
     {
+        $isPublishing = $this->isPublishing();
+
         return [
-            'titulo' => ['required', 'string', 'max:255'],
+            'submit_action' => ['nullable', 'in:publish,draft'],
+            'goto_new_docente' => ['nullable', 'boolean'],
+            'titulo' => [Rule::requiredIf($isPublishing), 'nullable', 'string', 'max:255'],
             'descricao' => ['nullable', 'string'],
             'publicado' => ['nullable', 'boolean'],
-            'criterio_nota_corte' => ['required', 'in:FIXA,MEDIA_FLUTUANTE,NUMERO_VAGAS,APROVACAO_MANUAL'],
-            'nota_corte_fixa' => ['nullable', 'numeric', 'min:0', 'max:10', 'required_if:criterio_nota_corte,FIXA'],
-            'nota_corte_offset' => ['nullable', 'numeric', 'min:-10', 'max:10', 'required_if:criterio_nota_corte,MEDIA_FLUTUANTE'],
-            'numero_vagas' => ['nullable', 'integer', 'min:1', 'required_if:criterio_nota_corte,NUMERO_VAGAS'],
+            'criterio_nota_corte' => [Rule::requiredIf($isPublishing), 'nullable', 'in:FIXA,MEDIA_FLUTUANTE,NUMERO_VAGAS,APROVACAO_MANUAL'],
+            'nota_corte_fixa' => ['nullable', 'numeric', 'min:0', 'max:10', Rule::requiredIf($isPublishing && $this->input('criterio_nota_corte') === 'FIXA')],
+            'nota_corte_offset' => ['nullable', 'numeric', 'min:-10', 'max:10', Rule::requiredIf($isPublishing && $this->input('criterio_nota_corte') === 'MEDIA_FLUTUANTE')],
+            'numero_vagas' => ['nullable', 'integer', 'min:1', Rule::requiredIf($isPublishing && $this->input('criterio_nota_corte') === 'NUMERO_VAGAS')],
             'arquivo_edital' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
-            'periodo_inscricao_inicio' => ['required', 'date'],
-            'periodo_inscricao_fim' => ['required', 'date', 'after_or_equal:periodo_inscricao_inicio'],
+            'periodo_inscricao_inicio' => [Rule::requiredIf($isPublishing), 'nullable', 'date'],
+            'periodo_inscricao_fim' => [Rule::requiredIf($isPublishing), 'nullable', 'date', 'after_or_equal:periodo_inscricao_inicio'],
             'banca_docentes' => ['nullable', 'array'],
             'banca_docentes.*.user_id' => ['nullable', 'integer', 'exists:users,id'],
             'banca_docentes.*.aprovador' => ['nullable', 'boolean'],
@@ -102,7 +107,7 @@ class AdminStoreEditalRequest extends FormRequest
                 }
             }
 
-            if (! $this->boolean('publicado')) {
+            if (! $this->isPublishing()) {
                 return;
             }
 
@@ -121,5 +126,10 @@ class AdminStoreEditalRequest extends FormRequest
                 $validator->errors()->add('arquivo_edital', 'Arquivo PDF do edital é obrigatório para publicação.');
             }
         });
+    }
+
+    private function isPublishing(): bool
+    {
+        return $this->boolean('publicado') || $this->input('submit_action') === 'publish';
     }
 }
