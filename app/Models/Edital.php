@@ -11,12 +11,21 @@ class Edital extends Model
 {
     use HasFactory;
 
+    public const CORTE_FIXA = 'FIXA';
+    public const CORTE_MEDIA_FLUTUANTE = 'MEDIA_FLUTUANTE';
+    public const CORTE_NUMERO_VAGAS = 'NUMERO_VAGAS';
+    public const CORTE_APROVACAO_MANUAL = 'APROVACAO_MANUAL';
+
     protected $table = 'editais';
 
     protected $fillable = [
         'titulo',
         'descricao',
         'publicado',
+        'criterio_nota_corte',
+        'nota_corte_fixa',
+        'nota_corte_offset',
+        'numero_vagas',
         'periodo_inscricao_inicio',
         'periodo_inscricao_fim',
         'arquivo_path',
@@ -29,6 +38,9 @@ class Edital extends Model
     {
         return [
             'publicado' => 'boolean',
+            'nota_corte_fixa' => 'decimal:2',
+            'nota_corte_offset' => 'decimal:2',
+            'numero_vagas' => 'integer',
             'periodo_inscricao_inicio' => 'datetime',
             'periodo_inscricao_fim' => 'datetime',
             'arquivo_size' => 'integer',

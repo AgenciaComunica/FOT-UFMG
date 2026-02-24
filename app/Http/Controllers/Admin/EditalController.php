@@ -269,6 +269,10 @@ class EditalController extends Controller
             'titulo' => $data['titulo'],
             'descricao' => $data['descricao'] ?? null,
             'publicado' => (bool) ($data['publicado'] ?? false),
+            'criterio_nota_corte' => $data['criterio_nota_corte'],
+            'nota_corte_fixa' => $data['criterio_nota_corte'] === Edital::CORTE_FIXA ? (float) $data['nota_corte_fixa'] : null,
+            'nota_corte_offset' => $data['criterio_nota_corte'] === Edital::CORTE_MEDIA_FLUTUANTE ? (float) $data['nota_corte_offset'] : null,
+            'numero_vagas' => $data['criterio_nota_corte'] === Edital::CORTE_NUMERO_VAGAS ? (int) $data['numero_vagas'] : null,
             'periodo_inscricao_inicio' => $this->normalizeDateTime($data['periodo_inscricao_inicio'], false),
             'periodo_inscricao_fim' => $this->normalizeDateTime($data['periodo_inscricao_fim'], true),
         ]);
@@ -335,6 +339,10 @@ class EditalController extends Controller
             'titulo' => $data['titulo'],
             'descricao' => $data['descricao'] ?? null,
             'publicado' => (bool) ($data['publicado'] ?? false),
+            'criterio_nota_corte' => $data['criterio_nota_corte'],
+            'nota_corte_fixa' => $data['criterio_nota_corte'] === Edital::CORTE_FIXA ? (float) $data['nota_corte_fixa'] : null,
+            'nota_corte_offset' => $data['criterio_nota_corte'] === Edital::CORTE_MEDIA_FLUTUANTE ? (float) $data['nota_corte_offset'] : null,
+            'numero_vagas' => $data['criterio_nota_corte'] === Edital::CORTE_NUMERO_VAGAS ? (int) $data['numero_vagas'] : null,
             'periodo_inscricao_inicio' => $this->normalizeDateTime($data['periodo_inscricao_inicio'], false),
             'periodo_inscricao_fim' => $this->normalizeDateTime($data['periodo_inscricao_fim'], true),
         ]);
@@ -448,6 +456,16 @@ class EditalController extends Controller
 
         if (! $edital->arquivo_path) {
             $missing[] = 'Arquivo PDF do edital';
+        }
+
+        if (! filled($edital->criterio_nota_corte)) {
+            $missing[] = 'Tipo da nota de corte';
+        } elseif ($edital->criterio_nota_corte === Edital::CORTE_FIXA && $edital->nota_corte_fixa === null) {
+            $missing[] = 'Nota de corte fixa';
+        } elseif ($edital->criterio_nota_corte === Edital::CORTE_MEDIA_FLUTUANTE && $edital->nota_corte_offset === null) {
+            $missing[] = 'Offset da média flutuante';
+        } elseif ($edital->criterio_nota_corte === Edital::CORTE_NUMERO_VAGAS && (int) $edital->numero_vagas < 1) {
+            $missing[] = 'Número de vagas';
         }
 
         if (! $edital->docentesBanca()->exists()) {

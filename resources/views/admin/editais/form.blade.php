@@ -21,9 +21,13 @@
             $publicadoInicial = (bool) old('publicado', $edital->exists ? $edital->publicado : false);
             $isEdit = $edital->exists;
             $hasArquivoAtual = (bool) $edital->arquivo_path;
+            $criterioNotaInicial = old('criterio_nota_corte', $edital->criterio_nota_corte ?: \App\Models\Edital::CORTE_APROVACAO_MANUAL);
+            $notaFixaInicial = old('nota_corte_fixa', $edital->nota_corte_fixa);
+            $offsetInicial = old('nota_corte_offset', $edital->nota_corte_offset ?? 0);
+            $numeroVagasInicial = old('numero_vagas', $edital->numero_vagas);
         @endphp
 
-        <form method="POST" action="{{ $formAction }}" enctype="multipart/form-data" class="panel-card space-y-6" x-data="editalDocsForm(@js($documentosInitial), @js($bancaDocentesInitial), @js($docentesDisponiveis), {{ $publicadoInicial ? 'true' : 'false' }}, {{ $isEdit ? 'true' : 'false' }}, {{ $hasArquivoAtual ? 'true' : 'false' }}, @js($edital->titulo ?? ''))">
+        <form method="POST" action="{{ $formAction }}" enctype="multipart/form-data" class="panel-card space-y-6" x-data="editalDocsForm(@js($documentosInitial), @js($bancaDocentesInitial), @js($docentesDisponiveis), @js($criterioNotaInicial), @js($notaFixaInicial), @js($offsetInicial), @js($numeroVagasInicial), {{ $publicadoInicial ? 'true' : 'false' }}, {{ $isEdit ? 'true' : 'false' }}, {{ $hasArquivoAtual ? 'true' : 'false' }}, @js($edital->titulo ?? ''))">
             @csrf
             @if ($method !== 'POST')
                 @method($method)
@@ -83,6 +87,61 @@
                             <a href="{{ route('public.editais.download', $edital) }}" class="font-semibold text-blue-700 hover:underline">Baixar</a>
                         </p>
                     @endif
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900">Nota de corte</h3>
+                    <p class="text-xs text-slate-500">Defina a regra de aprovação para o edital.</p>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Tipo de nota de corte</label>
+                            <select name="criterio_nota_corte" x-model="criterioNotaCorte" class="input-base mt-1">
+                                <option value="APROVACAO_MANUAL">Aprovação Manual</option>
+                                <option value="NUMERO_VAGAS">Número de vagas</option>
+                                <option value="FIXA">Média Fixa</option>
+                                <option value="MEDIA_FLUTUANTE">Média flutuante</option>
+                            </select>
+                        </div>
+
+                        <div x-show="criterioNotaCorte === 'APROVACAO_MANUAL'" class="md:col-span-1">
+                            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500 inline-flex items-center gap-1.5">
+                                Aprovação manual
+                                <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700 cursor-help" title="A secretaria aprova manualmente com base na avaliação dos docentes.">i</span>
+                            </label>
+                            <div class="mt-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                                A secretaria fará a homologação dos aprovados manualmente.
+                            </div>
+                        </div>
+
+                        <div x-show="criterioNotaCorte === 'FIXA'">
+                            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500 inline-flex items-center gap-1.5">
+                                Nota de corte
+                                <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700 cursor-help" title="Define uma nota fixa mínima. Alunos com nota final igual ou maior são aprovados.">i</span>
+                            </label>
+                            <input type="number" step="0.01" min="0" max="10" name="nota_corte_fixa" x-model="notaCorteFixa" class="input-base mt-1" placeholder="Ex.: 7.00">
+                        </div>
+
+                        <div x-show="criterioNotaCorte === 'MEDIA_FLUTUANTE'">
+                            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500 inline-flex items-center gap-1.5">
+                                Desvio da média flutuante
+                                <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700 cursor-help" title="Usa a média das notas dos inscritos e aplica este desvio (+/-) para definir a aprovação.">i</span>
+                            </label>
+                            <input type="number" step="0.01" min="-10" max="10" name="nota_corte_offset" x-model="notaCorteOffset" class="input-base mt-1" placeholder="Ex.: 0.50">
+                        </div>
+
+                        <div x-show="criterioNotaCorte === 'NUMERO_VAGAS'">
+                            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500 inline-flex items-center gap-1.5">
+                                Número de vagas
+                                <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700 cursor-help" title="Aprova os alunos com maiores notas até completar o número de vagas definido.">i</span>
+                            </label>
+                            <input type="number" min="1" step="1" name="numero_vagas" x-model="numeroVagas" class="input-base mt-1" placeholder="Ex.: 30">
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -299,7 +358,7 @@
     </div>
 
     <script>
-        function editalDocsForm(initialDocs, bancaDocentesInitial, docentesDisponiveis, publicadoInicial, isEdit, hasArquivoPersistido, deleteExpectedName) {
+        function editalDocsForm(initialDocs, bancaDocentesInitial, docentesDisponiveis, criterioNotaInicial, notaFixaInicial, offsetInicial, numeroVagasInicial, publicadoInicial, isEdit, hasArquivoPersistido, deleteExpectedName) {
             const normalized = (Array.isArray(initialDocs) ? initialDocs : []).map((doc, idx) => ({
                 key: `doc-${Date.now()}-${idx}`,
                 tipo: doc?.tipo ?? '',
@@ -316,6 +375,12 @@
                 bancaDocentes: (Array.isArray(bancaDocentesInitial) ? bancaDocentesInitial : [])
                     .map((id) => String(id ?? '').trim())
                     .filter((id) => id !== ''),
+                criterioNotaCorte: ['APROVACAO_MANUAL', 'FIXA', 'MEDIA_FLUTUANTE', 'NUMERO_VAGAS'].includes(criterioNotaInicial)
+                    ? criterioNotaInicial
+                    : 'APROVACAO_MANUAL',
+                notaCorteFixa: notaFixaInicial ?? '',
+                notaCorteOffset: offsetInicial ?? 0,
+                numeroVagas: numeroVagasInicial ?? '',
                 publicado: !!publicadoInicial,
                 isEdit: !!isEdit,
                 hasArquivoAtual: !!hasArquivoPersistido,
@@ -386,6 +451,9 @@
                     if (!inicio) missing.push('Início da inscrição');
                     if (!fim) missing.push('Fim da inscrição');
                     if (!this.hasArquivoAtual) missing.push('Arquivo PDF do edital');
+                    if (this.criterioNotaCorte === 'FIXA' && `${this.notaCorteFixa}`.trim() === '') missing.push('Nota de corte fixa');
+                    if (this.criterioNotaCorte === 'MEDIA_FLUTUANTE' && `${this.notaCorteOffset}`.trim() === '') missing.push('Offset da média flutuante');
+                    if (this.criterioNotaCorte === 'NUMERO_VAGAS' && (!this.numeroVagas || Number(this.numeroVagas) < 1)) missing.push('Número de vagas');
                     if (this.selectedDocentes().length < 1) missing.push('Banca de Docentes (mínimo 1)');
 
                     return missing;
