@@ -10,6 +10,10 @@
         </div>
 
         <p class="text-sm text-slate-600">Guarde este protocolo para acompanhamento.</p>
-        <a href="{{ route('home') }}" class="btn-muted">Voltar para início</a>
+        <div class="flex justify-center gap-2">
+            <a href="{{ route('public.inscricao.email.aviso', ['inscricao' => $inscricaoId]) }}" class="btn-muted">Aviso de verificação de e-mail</a>
+            <a href="{{ route('home', ['tab' => 'verificar']) }}" class="btn-primary">Verificar status da inscrição</a>
+            <a href="{{ route('home') }}" class="btn-muted">Voltar para início</a>
+        </div>
     </div>
 </x-guest-layout>

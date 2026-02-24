@@ -107,11 +107,14 @@ class PublicPortalController extends Controller
 
         $resultados = $query->map(function (Inscricao $inscricao) {
             return [
+                'id' => $inscricao->id,
                 'protocolo' => $inscricao->protocolo,
                 'nome_completo' => $inscricao->nome_completo,
                 'email' => $inscricao->email,
                 'cpf' => $inscricao->cpf,
                 'status' => $this->statusPublico($inscricao->status),
+                'email_verificado' => $inscricao->email_verified_at !== null,
+                'resend_key' => hash_hmac('sha256', $inscricao->id.'|'.$inscricao->email, (string) config('app.key')),
                 'edital' => $inscricao->edital?->titulo ?? '-',
                 'submitted_at' => optional($inscricao->submitted_at)->format('d/m/Y H:i'),
                 'decided_at' => optional($inscricao->decided_at)->format('d/m/Y H:i'),

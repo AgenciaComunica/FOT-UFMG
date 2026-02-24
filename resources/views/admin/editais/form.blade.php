@@ -155,7 +155,7 @@
                 </div>
 
                 <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <template x-for="(docenteId, index) in bancaDocentes" :key="`banca-${index}`">
+                    <template x-for="(docenteItem, index) in bancaDocentes" :key="`banca-${index}`">
                         <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                             <div class="mb-3 flex items-center justify-between gap-2">
                                 <p class="text-sm font-semibold text-slate-700" x-text="`Docente ${index + 1}`"></p>
@@ -166,14 +166,23 @@
                             <div class="space-y-3">
                                 <div>
                                     <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Selecionar docente</label>
-                                    <select :name="`banca_docentes[${index}]`" x-model="bancaDocentes[index]" class="input-base mt-1">
+                                    <select :name="`banca_docentes[${index}][user_id]`" x-model="bancaDocentes[index].user_id" class="input-base mt-1">
                                         <option value="">Selecione</option>
                                         <template x-for="docente in availableDocentes(index)" :key="`opt-${index}-${docente.id}`">
                                             <option :value="String(docente.id)" x-text="`${docente.name} (${docente.email})${docente.ativo ? '' : ' - Inativo'}`"></option>
                                         </template>
                                     </select>
                                 </div>
-                                <button type="button" @click="sortearDocente(index)" class="btn-muted !text-xs !px-3 !py-1.5">Sortear</button>
+                                <div class="flex items-end justify-between gap-3 pt-1">
+                                    <button type="button" @click="sortearDocente(index)" class="btn-muted !text-xs !px-3 !py-1.5">Sortear</button>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-semibold" :class="docenteItem.aprovador ? 'text-emerald-700' : 'text-slate-500'">Aprovador</span>
+                                        <button type="button" @click="docenteItem.aprovador = !docenteItem.aprovador" class="relative h-6 w-11 rounded-full transition" :class="docenteItem.aprovador ? 'bg-emerald-500' : 'bg-slate-300'">
+                                            <span class="absolute top-0.5 h-5 w-5 rounded-full bg-white transition" :class="docenteItem.aprovador ? 'left-5' : 'left-0.5'"></span>
+                                        </button>
+                                        <input type="hidden" :name="`banca_docentes[${index}][aprovador]`" :value="docenteItem.aprovador ? 1 : 0">
+                                    </div>
+                                </div>
                             </div>
                         </article>
                     </template>
@@ -376,8 +385,18 @@
                 docs: normalized,
                 docentesDisponiveis: Array.isArray(docentesDisponiveis) ? docentesDisponiveis : [],
                 bancaDocentes: (Array.isArray(bancaDocentesInitial) ? bancaDocentesInitial : [])
-                    .map((id) => String(id ?? '').trim())
-                    .filter((id) => id !== ''),
+                    .map((item) => {
+                        const rawId = typeof item === 'object' && item !== null
+                            ? (item.user_id ?? item.id ?? '')
+                            : item;
+                        return {
+                            user_id: String(rawId ?? '').trim(),
+                            aprovador: !!(typeof item === 'object' && item !== null
+                                ? item.aprovador
+                                : false),
+                        };
+                    })
+                    .filter((item) => item.user_id !== ''),
                 criterioNotaCorte: ['APROVACAO_MANUAL', 'FIXA', 'MEDIA_FLUTUANTE', 'NUMERO_VAGAS'].includes(criterioNotaInicial)
                     ? criterioNotaInicial
                     : 'APROVACAO_MANUAL',
@@ -400,14 +419,17 @@
                     return `documentos_requeridos[${index}][${name}][]`;
                 },
                 addBancaSlot() {
-                    this.bancaDocentes.push('');
+                    this.bancaDocentes.push({
+                        user_id: '',
+                        aprovador: false,
+                    });
                 },
                 removeBanca(index) {
                     this.bancaDocentes.splice(index, 1);
                 },
                 selectedDocentes(excludeIndex = null) {
                     return this.bancaDocentes
-                        .map((id, idx) => ({ id: String(id ?? '').trim(), idx }))
+                        .map((item, idx) => ({ id: String(item?.user_id ?? '').trim(), idx }))
                         .filter((item) => item.id !== '' && (excludeIndex === null || item.idx !== excludeIndex))
                         .map((item) => item.id);
                 },
@@ -418,11 +440,11 @@
                 sortearDocente(index) {
                     const pool = this.availableDocentes(index);
                     if (pool.length === 0) {
-                        this.bancaDocentes[index] = '';
+                        this.bancaDocentes[index].user_id = '';
                         return;
                     }
                     const random = pool[Math.floor(Math.random() * pool.length)];
-                    this.bancaDocentes[index] = String(random.id);
+                    this.bancaDocentes[index].user_id = String(random.id);
                 },
                 addDocument() {
                     this.docs.push({

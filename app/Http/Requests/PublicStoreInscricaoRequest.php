@@ -3,7 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Models\Edital;
+use App\Models\Inscricao;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class PublicStoreInscricaoRequest extends FormRequest
@@ -19,8 +21,8 @@ class PublicStoreInscricaoRequest extends FormRequest
 
         return [
             'nome_completo' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255'],
-            'cpf' => ['required', 'string', 'max:20'],
+            'email' => ['required', 'email', 'max:255', Rule::unique(Inscricao::class, 'email')],
+            'cpf' => ['required', 'string', 'max:20', Rule::unique(Inscricao::class, 'cpf')],
             'telefone' => ['nullable', 'string', 'max:30'],
             'documentos' => ['nullable', 'array'],
             'documentos.*' => ['nullable', 'file', 'max:'.$maxPdfKb],
@@ -97,6 +99,25 @@ class PublicStoreInscricaoRequest extends FormRequest
                     $validator->errors()->add('documentos.'.$docId, 'MIME inválido para o formato enviado.');
                 }
             }
+
+            $cpfDigits = preg_replace('/\D+/', '', (string) $this->input('cpf'));
+            if ($cpfDigits !== '') {
+                $cpfExists = Inscricao::query()
+                    ->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), '/', ''), ' ', '') = ?", [$cpfDigits])
+                    ->exists();
+
+                if ($cpfExists) {
+                    $validator->errors()->add('cpf', 'Este CPF já possui uma inscrição cadastrada. Em caso de erro, entre em contato com a secretaria.');
+                }
+            }
         });
+    }
+
+    public function messages(): array
+    {
+        return [
+            'email.unique' => 'Este e-mail já possui uma inscrição cadastrada. Em caso de erro, entre em contato com a secretaria.',
+            'cpf.unique' => 'Este CPF já possui uma inscrição cadastrada. Em caso de erro, entre em contato com a secretaria.',
+        ];
     }
 }

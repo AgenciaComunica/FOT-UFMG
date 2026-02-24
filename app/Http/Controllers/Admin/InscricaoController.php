@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AdminHomologarInscricaoRequest;
 use App\Http\Requests\AdminIndeferirInscricaoRequest;
+use App\Http\Requests\AdminUpdateInscricaoRequest;
+use App\Mail\InscricaoRecebidaMail;
+use App\Mail\InscricaoResultadoMail;
 use App\Models\Edital;
 use App\Models\Inscricao;
 use App\Models\InscricaoAvaliacao;
@@ -16,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -218,14 +222,121 @@ class InscricaoController extends Controller
             'inscricao' => $inscricao,
             'avaliacoesPainel' => $avaliacoesPainel,
             'mediaAvaliacoes' => $mediaAvaliacoes !== null ? number_format((float) $mediaAvaliacoes, 2, ',', '.') : null,
-            'podeHomologar' => $inscricao->status === Inscricao::STATUS_RECEBIDA
-                && $inscricao->possuiDocumentosObrigatorios(),
         ]);
+    }
+
+    public function update(AdminUpdateInscricaoRequest $request, Inscricao $inscricao): RedirectResponse
+    {
+        $this->authorize('view', $inscricao);
+        $data = $request->validated();
+
+        $emailAlterado = mb_strtolower($inscricao->email) !== mb_strtolower($data['email']);
+        $cpfAlterado = preg_replace('/\D+/', '', (string) $inscricao->cpf) !== preg_replace('/\D+/', '', (string) $data['cpf']);
+
+        $inscricao->update([
+            'nome_completo' => $data['nome_completo'],
+            'email' => $data['email'],
+            'cpf' => $data['cpf'],
+            'telefone' => $data['telefone'] ?? null,
+            'email_verified_at' => $emailAlterado ? null : $inscricao->email_verified_at,
+            'email_verification_token' => $emailAlterado ? hash('sha256', Str::uuid().'|'.$data['email']) : $inscricao->email_verification_token,
+            'verification_sent_at' => $emailAlterado ? null : $inscricao->verification_sent_at,
+        ]);
+
+        if ($cpfAlterado || $emailAlterado) {
+            $inscricao->forceFill([
+                'status' => $inscricao->status === Inscricao::STATUS_HOMOLOGADA ? Inscricao::STATUS_RECEBIDA : $inscricao->status,
+            ])->save();
+        }
+
+        if ($emailAlterado) {
+            $this->enviarVerificacaoInscricao($inscricao->fresh(['edital']));
+        }
+
+        return redirect()
+            ->route('admin.inscricoes.show', ['inscricao' => $inscricao, 'tab' => 'dados'])
+            ->with('status', 'Dados da inscrição atualizados com sucesso.');
+    }
+
+    public function updateDocumento(Request $request, Inscricao $inscricao, InscricaoDocumento $doc): RedirectResponse
+    {
+        $this->authorize('view', $inscricao);
+        $this->authorize('view', $doc);
+        abort_unless($doc->inscricao_id === $inscricao->id, 404);
+
+        $maxKb = (int) config('inscricoes.max_pdf_kb', 10_240);
+        $validated = $request->validate([
+            'arquivo' => ['required', 'file', 'max:'.$maxKb],
+        ], [
+            'arquivo.required' => 'Selecione um arquivo para substituição.',
+            'arquivo.file' => 'Arquivo inválido.',
+            'arquivo.max' => 'O arquivo excede o tamanho máximo permitido.',
+        ]);
+
+        $inscricao->loadMissing('edital.documentosRequeridos');
+
+        $file = $validated['arquivo'];
+        $extensao = strtolower((string) $file->getClientOriginalExtension());
+        if ($extensao === 'jpeg') {
+            $extensao = 'jpg';
+        }
+
+        $formatosAceitos = $this->formatosAceitosDocumento($inscricao, $doc->tipo);
+        if (! in_array($extensao, $formatosAceitos, true)) {
+            throw ValidationException::withMessages([
+                'arquivo' => 'Formato inválido. Permitidos: '.strtoupper(implode(', ', $formatosAceitos)).'.',
+            ]);
+        }
+
+        $this->assertMimeDocumento($file->getMimeType(), $extensao);
+
+        if (filled($doc->arquivo_path) && Storage::disk('local')->exists($doc->arquivo_path)) {
+            Storage::disk('local')->delete($doc->arquivo_path);
+        }
+
+        $safeTipo = Str::slug($doc->tipo, '_');
+        $fileName = 'doc_'.$doc->id.'_'.$safeTipo.'.'.$extensao;
+        $directory = 'inscricoes/'.$inscricao->id;
+        Storage::disk('local')->putFileAs($directory, $file, $fileName);
+
+        $doc->update([
+            'arquivo_path' => $directory.'/'.$fileName,
+            'original_name' => $file->getClientOriginalName(),
+            'mime' => $file->getMimeType() ?? 'application/octet-stream',
+            'size' => $file->getSize(),
+            'uploaded_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('admin.inscricoes.show', ['inscricao' => $inscricao, 'tab' => 'documentos'])
+            ->with('status', 'Documento substituído com sucesso.');
+    }
+
+    public function destroyDocumento(Inscricao $inscricao, InscricaoDocumento $doc): RedirectResponse
+    {
+        $this->authorize('view', $inscricao);
+        $this->authorize('view', $doc);
+        abort_unless($doc->inscricao_id === $inscricao->id, 404);
+
+        if (filled($doc->arquivo_path) && Storage::disk('local')->exists($doc->arquivo_path)) {
+            Storage::disk('local')->delete($doc->arquivo_path);
+        }
+
+        $doc->delete();
+
+        return redirect()
+            ->route('admin.inscricoes.show', ['inscricao' => $inscricao, 'tab' => 'documentos'])
+            ->with('status', 'Documento removido com sucesso.');
     }
 
     public function salvarAvaliacao(Request $request, Inscricao $inscricao): RedirectResponse
     {
         $this->authorize('view', $inscricao);
+        if (! $inscricao->isEmailVerified()) {
+            throw ValidationException::withMessages([
+                'avaliacao' => 'A inscrição só pode ser avaliada após verificação do e-mail.',
+            ]);
+        }
 
         $data = $request->validate([
             'docente_id' => ['required', 'integer', 'exists:users,id'],
@@ -269,6 +380,11 @@ class InscricaoController extends Controller
     public function limparAvaliacao(Request $request, Inscricao $inscricao): RedirectResponse
     {
         $this->authorize('view', $inscricao);
+        if (! $inscricao->isEmailVerified()) {
+            throw ValidationException::withMessages([
+                'avaliacao' => 'A inscrição só pode ser avaliada após verificação do e-mail.',
+            ]);
+        }
 
         $data = $request->validate([
             'docente_id' => ['required', 'integer', 'exists:users,id'],
@@ -342,6 +458,43 @@ class InscricaoController extends Controller
         }
     }
 
+    private function formatosAceitosDocumento(Inscricao $inscricao, string $tipo): array
+    {
+        $requerido = $inscricao->edital?->documentosRequeridos
+            ->first(fn ($doc) => $doc->tipo === $tipo);
+
+        $formatos = $requerido?->formatos_aceitos ?? [];
+
+        if (empty($formatos)) {
+            return ['pdf', 'docx', 'jpg', 'png'];
+        }
+
+        return $formatos;
+    }
+
+    private function assertMimeDocumento(?string $mime, string $extensao): void
+    {
+        $mime = strtolower((string) $mime);
+        $mimeValidoPorExtensao = [
+            'pdf' => ['application/pdf', 'application/x-pdf'],
+            'docx' => [
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/zip',
+            ],
+            'jpg' => ['image/jpeg', 'image/jpg'],
+            'png' => ['image/png'],
+        ];
+
+        if (
+            isset($mimeValidoPorExtensao[$extensao]) &&
+            ! in_array($mime, $mimeValidoPorExtensao[$extensao], true)
+        ) {
+            throw ValidationException::withMessages([
+                'arquivo' => 'MIME inválido para o formato enviado.',
+            ]);
+        }
+    }
+
     public function homologar(AdminHomologarInscricaoRequest $request, Inscricao $inscricao): RedirectResponse
     {
         $flashPassword = null;
@@ -362,6 +515,11 @@ class InscricaoController extends Controller
             if (! $inscricao->possuiDocumentosObrigatorios()) {
                 throw ValidationException::withMessages([
                     'documentos' => 'Não é possível homologar com documentos obrigatórios faltando.',
+                ]);
+            }
+            if (! $inscricao->isEmailVerified()) {
+                throw ValidationException::withMessages([
+                    'email' => 'Não é possível homologar sem e-mail verificado da inscrição.',
                 ]);
             }
 
@@ -391,6 +549,8 @@ class InscricaoController extends Controller
                 'user_id' => $user->id,
             ]);
 
+            $this->enviarResultadoInscricao($inscricao);
+
             $canUseResetFlow = config('mail.default') !== 'log';
             if ($canUseResetFlow && Password::sendResetLink(['email' => $user->email]) === Password::RESET_LINK_SENT) {
                 $flashMessage = 'Inscrição homologada e link para definir senha enviado ao aluno.';
@@ -412,6 +572,90 @@ class InscricaoController extends Controller
             ->with('senha_temporaria', $flashPassword);
     }
 
+    public function updateStatus(Request $request, Inscricao $inscricao): RedirectResponse
+    {
+        $this->authorize('view', $inscricao);
+
+        $data = $request->validate([
+            'status' => ['required', 'in:RECEBIDA,HOMOLOGADA,INDEFERIDA'],
+            'indeferimento_motivo' => ['nullable', 'string', 'max:4000'],
+        ], [
+            'status.required' => 'Selecione um status válido.',
+            'status.in' => 'Status inválido.',
+        ]);
+
+        if ($data['status'] === Inscricao::STATUS_INDEFERIDA && ! filled($data['indeferimento_motivo'] ?? null)) {
+            throw ValidationException::withMessages([
+                'indeferimento_motivo' => 'O motivo é obrigatório para definir como indeferida.',
+            ]);
+        }
+
+        DB::transaction(function () use ($request, $inscricao, $data): void {
+            $inscricao = Inscricao::query()
+                ->with(['edital.documentosRequeridos', 'documentos'])
+                ->lockForUpdate()
+                ->findOrFail($inscricao->id);
+
+            $status = $data['status'];
+
+            if ($status === Inscricao::STATUS_HOMOLOGADA) {
+                $user = User::query()->where('email', $inscricao->email)->first();
+
+                if ($user && $user->role !== User::ROLE_ALUNO) {
+                    throw ValidationException::withMessages([
+                        'status' => 'Já existe usuário com este e-mail e role diferente de aluno.',
+                    ]);
+                }
+
+                if (! $user) {
+                    $user = User::create([
+                        'name' => $inscricao->nome_completo,
+                        'email' => $inscricao->email,
+                        'password' => Str::password(20),
+                        'role' => User::ROLE_ALUNO,
+                        'email_verified_at' => now(),
+                    ]);
+                }
+
+                $inscricao->forceFill([
+                    'status' => Inscricao::STATUS_HOMOLOGADA,
+                    'decided_at' => now(),
+                    'decided_by' => $request->user()->id,
+                    'indeferimento_motivo' => null,
+                    'user_id' => $user->id,
+                ])->save();
+
+                $this->enviarResultadoInscricao($inscricao);
+
+                return;
+            }
+
+            if ($status === Inscricao::STATUS_INDEFERIDA) {
+                $inscricao->forceFill([
+                    'status' => Inscricao::STATUS_INDEFERIDA,
+                    'decided_at' => now(),
+                    'decided_by' => $request->user()->id,
+                    'indeferimento_motivo' => trim((string) $data['indeferimento_motivo']),
+                ])->save();
+
+                $this->enviarResultadoInscricao($inscricao);
+
+                return;
+            }
+
+            $inscricao->forceFill([
+                'status' => Inscricao::STATUS_RECEBIDA,
+                'decided_at' => null,
+                'decided_by' => null,
+                'indeferimento_motivo' => null,
+            ])->save();
+        });
+
+        return redirect()
+            ->route('admin.inscricoes.show', ['inscricao' => $inscricao, 'tab' => 'dados'])
+            ->with('status', 'Status da inscrição atualizado com sucesso.');
+    }
+
     public function indeferir(AdminIndeferirInscricaoRequest $request, Inscricao $inscricao): RedirectResponse
     {
         if ($inscricao->status !== Inscricao::STATUS_RECEBIDA) {
@@ -426,6 +670,8 @@ class InscricaoController extends Controller
             'decided_by' => $request->user()->id,
             'indeferimento_motivo' => $request->validated('indeferimento_motivo'),
         ]);
+
+        $this->enviarResultadoInscricao($inscricao);
 
         return redirect()
             ->route('admin.inscricoes.show', $inscricao)
@@ -494,5 +740,58 @@ class InscricaoController extends Controller
         }, $filename, [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
+    }
+
+    private function enviarResultadoInscricao(Inscricao $inscricao): void
+    {
+        if (! filled($inscricao->email)) {
+            return;
+        }
+
+        try {
+            Mail::to($inscricao->email)->send(
+                new InscricaoResultadoMail(
+                    $inscricao->fresh(['edital']),
+                    $this->statusPublico($inscricao->status),
+                    route('home', ['tab' => 'verificar'])
+                )
+            );
+        } catch (\Throwable) {
+        }
+
+        if (Schema::hasColumn('inscricoes', 'resultado_email_sent_at')) {
+            $inscricao->forceFill([
+                'resultado_email_sent_at' => now(),
+            ])->save();
+        }
+    }
+
+    private function statusPublico(string $status): string
+    {
+        return match ($status) {
+            Inscricao::STATUS_HOMOLOGADA => 'Aprovado/Homologado',
+            Inscricao::STATUS_INDEFERIDA => 'Não aprovado/Indeferido',
+            default => 'Em análise',
+        };
+    }
+
+    private function enviarVerificacaoInscricao(Inscricao $inscricao): void
+    {
+        if (! filled($inscricao->email) || ! filled($inscricao->email_verification_token)) {
+            return;
+        }
+
+        $verificationUrl = route('public.inscricao.email.verificar', [
+            'inscricao' => $inscricao,
+            'token' => $inscricao->email_verification_token,
+        ]);
+        $statusUrl = route('home', ['tab' => 'verificar']);
+
+        try {
+            Mail::to($inscricao->email)->send(
+                new InscricaoRecebidaMail($inscricao, $verificationUrl, $statusUrl)
+            );
+        } catch (\Throwable) {
+        }
     }
 }

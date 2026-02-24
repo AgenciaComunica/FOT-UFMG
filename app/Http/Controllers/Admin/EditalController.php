@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AdminStoreEditalRequest;
 use App\Http\Requests\AdminUpdateEditalRequest;
+use App\Mail\EditalPublicadoDocentesMail;
 use App\Models\Edital;
 use App\Models\Inscricao;
 use App\Models\User;
@@ -12,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -295,6 +297,9 @@ class EditalController extends Controller
 
         $this->syncDocumentosRequeridos($edital, $data['documentos_requeridos'] ?? []);
         $this->syncBancaDocentes($edital, $data['banca_docentes'] ?? []);
+        if ($edital->publicado) {
+            $this->notificarDocentesBancaPublicacao($edital);
+        }
 
         return redirect()
             ->route('admin.editais.index')
@@ -313,7 +318,10 @@ class EditalController extends Controller
                 ->get(['id', 'name', 'email', 'ativo']),
             'bancaDocentesInitial' => old('banca_docentes', $edital->docentesBanca
                 ->sortBy('pivot.ordem')
-                ->pluck('id')
+                ->map(fn ($docente) => [
+                    'user_id' => $docente->id,
+                    'aprovador' => (bool) ($docente->pivot->aprovador ?? false),
+                ])
                 ->values()
                 ->all()),
             'documentosInitial' => old('documentos_requeridos', $edital->documentosRequeridos
@@ -334,6 +342,7 @@ class EditalController extends Controller
     public function update(AdminUpdateEditalRequest $request, Edital $edital): RedirectResponse
     {
         $data = $request->validated();
+        $wasPublicado = (bool) $edital->publicado;
 
         $edital->update([
             'titulo' => $data['titulo'],
@@ -369,6 +378,9 @@ class EditalController extends Controller
 
         $this->syncDocumentosRequeridos($edital, $data['documentos_requeridos'] ?? []);
         $this->syncBancaDocentes($edital, $data['banca_docentes'] ?? []);
+        if (! $wasPublicado && $edital->publicado) {
+            $this->notificarDocentesBancaPublicacao($edital);
+        }
 
         return redirect()
             ->route('admin.editais.index')
@@ -393,6 +405,7 @@ class EditalController extends Controller
     public function updatePublicacao(Request $request, Edital $edital): RedirectResponse
     {
         $publicado = $request->boolean('publicado');
+        $wasPublicado = (bool) $edital->publicado;
 
         if ($publicado) {
             $missing = $this->missingCamposPublicacao($edital);
@@ -406,6 +419,9 @@ class EditalController extends Controller
         $edital->update([
             'publicado' => $publicado,
         ]);
+        if (! $wasPublicado && $publicado) {
+            $this->notificarDocentesBancaPublicacao($edital);
+        }
 
         return back()->with('status', 'Status do edital atualizado com sucesso.');
     }
@@ -506,12 +522,17 @@ class EditalController extends Controller
     /**
      * @param  array<int, mixed>  $docentesIds
      */
-    private function syncBancaDocentes(Edital $edital, array $docentesIds): void
+    private function syncBancaDocentes(Edital $edital, array $docentesRows): void
     {
-        $clean = collect($docentesIds)
-            ->filter(fn ($id) => filled($id))
-            ->map(fn ($id) => (int) $id)
-            ->unique()
+        $clean = collect($docentesRows)
+            ->map(function ($row) {
+                return [
+                    'user_id' => (int) (is_array($row) ? ($row['user_id'] ?? 0) : 0),
+                    'aprovador' => (bool) (is_array($row) ? ($row['aprovador'] ?? false) : false),
+                ];
+            })
+            ->filter(fn ($row) => $row['user_id'] > 0)
+            ->unique('user_id')
             ->values();
 
         if ($clean->isEmpty()) {
@@ -520,7 +541,7 @@ class EditalController extends Controller
         }
 
         $validos = User::query()
-            ->whereIn('id', $clean)
+            ->whereIn('id', $clean->pluck('user_id'))
             ->where('role', User::ROLE_DOCENTE)
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
@@ -528,13 +549,32 @@ class EditalController extends Controller
 
         $payload = [];
         $ordem = 1;
-        foreach ($clean as $id) {
+        foreach ($clean as $row) {
+            $id = (int) $row['user_id'];
             if (! in_array($id, $validos, true)) {
                 continue;
             }
-            $payload[$id] = ['ordem' => $ordem++];
+            $payload[$id] = [
+                'ordem' => $ordem++,
+                'aprovador' => (bool) $row['aprovador'],
+            ];
         }
 
         $edital->docentesBanca()->sync($payload);
+    }
+
+    private function notificarDocentesBancaPublicacao(Edital $edital): void
+    {
+        $edital->loadMissing('docentesBanca');
+
+        $docentes = $edital->docentesBanca
+            ->filter(fn (User $docente) => filled($docente->email));
+
+        foreach ($docentes as $docente) {
+            try {
+                Mail::to($docente->email)->send(new EditalPublicadoDocentesMail($edital));
+            } catch (\Throwable) {
+            }
+        }
     }
 }

@@ -27,6 +27,12 @@
         >
 
             <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                @if (session('status'))
+                    <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+                        {{ session('status') }}
+                    </div>
+                @endif
+
                 <div class="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
                     <div>
                         <h1 class="text-2xl font-extrabold text-slate-900">Editais</h1>
@@ -198,6 +204,7 @@
                     <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <h2 class="text-base font-bold text-slate-900">Verificar inscrição</h2>
                         <p class="mt-1 text-xs text-slate-500">Informe protocolo, e-mail ou CPF para localizar sua inscrição.</p>
+                        <p class="mt-1 text-xs text-amber-700">Se houver erro de CPF ou e-mail, entre em contato com a secretaria com urgência.</p>
                         <form method="POST" action="{{ route('public.inscricoes.verificar') }}" class="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
                             @csrf
                             <input type="text" name="{{ $honeypotField }}" class="hidden" tabindex="-1" autocomplete="off">
@@ -224,6 +231,14 @@
                                             <div class="grid gap-2 md:grid-cols-2">
                                                 <p><strong>Protocolo:</strong> {{ $item['protocolo'] ?? '-' }}</p>
                                                 <p><strong>Status:</strong> {{ $item['status'] ?? '-' }}</p>
+                                                <p>
+                                                    <strong>E-mail verificado:</strong>
+                                                    @if (!empty($item['email_verificado']))
+                                                        <span class="status-badge status-homologada">Sim</span>
+                                                    @else
+                                                        <span class="status-badge status-indeferida">Não verificado</span>
+                                                    @endif
+                                                </p>
                                                 <p><strong>Nome:</strong> {{ $item['nome_completo'] ?? '-' }}</p>
                                                 <p><strong>Edital:</strong> {{ $item['edital'] ?? '-' }}</p>
                                                 <p><strong>E-mail:</strong> {{ $item['email'] ?? '-' }}</p>
@@ -231,6 +246,16 @@
                                                 <p><strong>Enviado em:</strong> {{ $item['submitted_at'] ?? '-' }}</p>
                                                 <p><strong>Decidido em:</strong> {{ $item['decided_at'] ?? '-' }}</p>
                                             </div>
+                                            @if (empty($item['email_verificado']) && !empty($item['id']))
+                                                <div class="mt-3 flex flex-wrap items-center gap-2">
+                                                    <form method="POST" action="{{ route('public.inscricao.email.reenviar', $item['id']) }}">
+                                                        @csrf
+                                                        <input type="hidden" name="resend_key" value="{{ $item['resend_key'] ?? '' }}">
+                                                        <button type="submit" class="btn-primary">Reenviar verificação de e-mail</button>
+                                                    </form>
+                                                    <p class="text-xs text-amber-700">Sem verificação, a candidatura pode ser indeferida automaticamente.</p>
+                                                </div>
+                                            @endif
                                         </article>
                                     @endforeach
                                 </div>

@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AdminStoreDocenteRequest;
 use App\Http\Requests\AdminUpdateDocenteRequest;
+use App\Mail\DocenteCredenciaisIniciaisMail;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -68,24 +70,36 @@ class DocenteController extends Controller
     public function store(AdminStoreDocenteRequest $request): RedirectResponse
     {
         $data = $request->validated();
+        $senhaTemporaria = Str::password(12);
 
-        User::query()->create([
+        $docente = User::query()->create([
             'name' => $data['name'],
             'email' => $data['email'],
             'telefone' => $data['telefone'] ?? null,
-            'password' => Str::password(20),
+            'password' => $senhaTemporaria,
             'role' => User::ROLE_DOCENTE,
             'ativo' => $request->boolean('ativo'),
             'email_verified_at' => now(),
         ]);
+
+        try {
+            Mail::to($docente->email)->send(new DocenteCredenciaisIniciaisMail(
+                $docente->name,
+                $docente->email,
+                $senhaTemporaria,
+                route('login'),
+                route('password.request'),
+            ));
+        } catch (\Throwable) {
+        }
 
         $resetSent = Password::sendResetLink(['email' => $data['email']]) === Password::RESET_LINK_SENT;
 
         return redirect()
             ->route('admin.docentes.index')
             ->with('status', $resetSent
-                ? 'Docente cadastrado com sucesso. Link de redefinição de senha enviado por e-mail.'
-                : 'Docente cadastrado com sucesso. Não foi possível enviar o link de redefinição (verifique configuração de e-mail).');
+                ? 'Docente cadastrado com sucesso. Credenciais iniciais e link de redefinição enviados por e-mail.'
+                : 'Docente cadastrado com sucesso. Credenciais iniciais enviadas; não foi possível enviar o link de redefinição.');
     }
 
     public function edit(User $docente): View
@@ -229,15 +243,27 @@ class DocenteController extends Controller
                 continue;
             }
 
-            User::query()->create([
+            $senhaTemporaria = Str::password(12);
+            $docente = User::query()->create([
                 'name' => $nome,
                 'email' => $email,
                 'telefone' => $telefone !== '' ? $telefone : null,
-                'password' => Str::password(20),
+                'password' => $senhaTemporaria,
                 'role' => User::ROLE_DOCENTE,
                 'ativo' => true,
                 'email_verified_at' => now(),
             ]);
+
+            try {
+                Mail::to($docente->email)->send(new DocenteCredenciaisIniciaisMail(
+                    $docente->name,
+                    $docente->email,
+                    $senhaTemporaria,
+                    route('login'),
+                    route('password.request'),
+                ));
+            } catch (\Throwable) {
+            }
 
             Password::sendResetLink(['email' => $email]);
             $importados++;

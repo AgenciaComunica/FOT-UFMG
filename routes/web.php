@@ -24,6 +24,13 @@ Route::post('/editais/{edital}/inscricao', [PublicInscricaoController::class, 's
     ->name('public.inscricao.store');
 Route::get('/editais/{edital}/inscricao/confirmacao/{protocolo}', [PublicInscricaoController::class, 'confirmacao'])
     ->name('public.inscricao.confirmacao');
+Route::get('/inscricoes/{inscricao}/aviso-verificacao', [PublicInscricaoController::class, 'avisoVerificacao'])
+    ->name('public.inscricao.email.aviso');
+Route::get('/inscricoes/{inscricao}/verificar-email/{token}', [PublicInscricaoController::class, 'verificarEmail'])
+    ->name('public.inscricao.email.verificar');
+Route::post('/inscricoes/{inscricao}/reenviar-verificacao', [PublicInscricaoController::class, 'reenviarVerificacao'])
+    ->middleware('throttle:4,1')
+    ->name('public.inscricao.email.reenviar');
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardRedirectController::class)->name('dashboard');
@@ -49,6 +56,10 @@ Route::prefix('admin')
 
         Route::get('/editais/{edital}/inscricoes', [AdminInscricaoController::class, 'byEdital'])->name('editais.inscricoes.index');
         Route::get('/inscricoes/{inscricao}', [AdminInscricaoController::class, 'show'])->name('inscricoes.show');
+        Route::put('/inscricoes/{inscricao}', [AdminInscricaoController::class, 'update'])->name('inscricoes.update');
+        Route::post('/inscricoes/{inscricao}/status', [AdminInscricaoController::class, 'updateStatus'])->name('inscricoes.status');
+        Route::put('/inscricoes/{inscricao}/documentos/{doc}', [AdminInscricaoController::class, 'updateDocumento'])->name('inscricoes.documentos.update');
+        Route::delete('/inscricoes/{inscricao}/documentos/{doc}', [AdminInscricaoController::class, 'destroyDocumento'])->name('inscricoes.documentos.destroy');
         Route::post('/inscricoes/{inscricao}/homologar', [AdminInscricaoController::class, 'homologar'])->name('inscricoes.homologar');
         Route::post('/inscricoes/{inscricao}/indeferir', [AdminInscricaoController::class, 'indeferir'])->name('inscricoes.indeferir');
         Route::post('/inscricoes/{inscricao}/avaliacoes/salvar', [AdminInscricaoController::class, 'salvarAvaliacao'])->name('inscricoes.avaliacoes.salvar');
@@ -81,6 +92,7 @@ Route::prefix('docente')
         Route::get('/inscricoes', [DocentePainelController::class, 'index'])->name('inscricoes.index');
         Route::get('/inscricoes/{inscricao}/avaliar', [DocentePainelController::class, 'show'])->name('inscricoes.show');
         Route::post('/inscricoes/{inscricao}/avaliar', [DocentePainelController::class, 'salvarAvaliacao'])->name('inscricoes.salvar');
+        Route::post('/inscricoes/{inscricao}/status', [DocentePainelController::class, 'definirVereditoFinal'])->name('inscricoes.status');
         Route::get('/inscricoes/{inscricao}/documentos/{doc}/download', [DocentePainelController::class, 'downloadDocumento'])->name('inscricoes.documentos.download');
     });
 

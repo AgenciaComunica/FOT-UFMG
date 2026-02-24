@@ -66,6 +66,7 @@
                         <th>Nome</th>
                         <th>Edital</th>
                         <th>Status</th>
+                        <th>E-mail verificado</th>
                         <th>Enviada em</th>
                         <th>Ações</th>
                     </tr>
@@ -89,14 +90,29 @@
                             <td>{{ $inscricao->nome_completo }}</td>
                             <td>{{ $inscricao->edital?->titulo ?? '-' }}</td>
                             <td><span class="status-badge {{ $statusClass }}">{{ $statusLabel }}</span></td>
+                            <td>
+                                @if ($inscricao->email_verified_at)
+                                    <span class="status-badge status-homologada">Verificado</span>
+                                @else
+                                    <span class="status-badge status-indeferida">Não verificado</span>
+                                @endif
+                            </td>
                             <td>{{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</td>
                             <td>
-                                <a href="{{ route('admin.inscricoes.show', $inscricao) }}" class="text-blue-600 hover:underline">Ver detalhe</a>
+                                <div class="flex items-center gap-2">
+                                    <a href="{{ route('admin.inscricoes.show', $inscricao) }}"
+                                       class="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M10 3C5 3 1.73 7.11 1 9c.73 1.89 4 6 9 6s8.27-4.11 9-6c-.73-1.89-4-6-9-6zm0 10a4 4 0 110-8 4 4 0 010 8z" />
+                                        </svg>
+                                        Ver detalhes
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-slate-500">Nenhuma inscrição encontrada.</td>
+                            <td colspan="7" class="text-slate-500">Nenhuma inscrição encontrada.</td>
                         </tr>
                     @endforelse
                 </tbody>

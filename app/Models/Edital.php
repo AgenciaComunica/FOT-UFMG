@@ -43,6 +43,7 @@ class Edital extends Model
             'numero_vagas' => 'integer',
             'periodo_inscricao_inicio' => 'datetime',
             'periodo_inscricao_fim' => 'datetime',
+            'inscricoes_encerramento_notificado_at' => 'datetime',
             'arquivo_size' => 'integer',
         ];
     }
@@ -60,7 +61,7 @@ class Edital extends Model
     public function docentesBanca(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'edital_docentes')
-            ->withPivot('ordem')
+            ->withPivot('ordem', 'aprovador')
             ->withTimestamps()
             ->orderBy('edital_docentes.ordem');
     }

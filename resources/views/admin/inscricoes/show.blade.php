@@ -1,4 +1,5 @@
 <x-app-layout>
+    <style>[x-cloak]{display:none!important;}</style>
     <x-slot name="header">
         <div class="flex w-full items-center justify-between gap-3">
             <div>
@@ -10,6 +11,9 @@
     </x-slot>
 
     @php
+        $tabInitial = in_array(request('tab'), ['dados', 'documentos', 'avaliacoes'], true)
+            ? request('tab')
+            : 'dados';
         $avaliacoesJson = $avaliacoesPainel->map(function ($item) {
             return [
                 'docente_id' => $item['docente']->id,
@@ -23,7 +27,7 @@
     @endphp
 
     <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8"
-         x-data="inscricaoAvaliacaoPage(@js($avaliacoesJson))">
+         x-data="inscricaoAvaliacaoPage(@js($avaliacoesJson), @js($tabInitial))">
 
         @if (session('status'))
             <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{{ session('status') }}</div>
@@ -66,7 +70,7 @@
                 </span>
             </div>
 
-            <div x-show="tab === 'dados'" x-transition class="space-y-2 text-sm text-slate-700">
+            <div x-show="tab === 'dados'" x-transition>
                 @php
                     $statusClass = match($inscricao->status) {
                         'HOMOLOGADA' => 'status-homologada',
@@ -79,15 +83,31 @@
                         default => 'Em Análise',
                     };
                 @endphp
-                <p><strong>Nome:</strong> {{ $inscricao->nome_completo }}</p>
-                <p><strong>Email:</strong> {{ $inscricao->email }}</p>
-                <p><strong>CPF:</strong> {{ $inscricao->cpf }}</p>
-                <p><strong>Telefone:</strong> {{ $inscricao->telefone ?: '-' }}</p>
-                <p><strong>Status:</strong> <span class="status-badge {{ $statusClass }}">{{ $statusLabel }}</span></p>
-                <p><strong>Enviado em:</strong> {{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</p>
-                <p><strong>Decidido em:</strong> {{ optional($inscricao->decided_at)->format('d/m/Y H:i') ?: '-' }}</p>
-                <p><strong>Decidido por:</strong> {{ optional($inscricao->decidedByUser)->name ?: '-' }}</p>
-                <p><strong>Motivo indeferimento:</strong> {{ $inscricao->indeferimento_motivo ?: '-' }}</p>
+                <div class="rounded-xl border border-slate-200 p-4">
+                    <div class="mb-4 flex items-center justify-between gap-3">
+                        <h3 class="text-sm font-semibold text-slate-800">Dados da inscrição</h3>
+                        <button type="button" class="btn-primary" @click="modalDados = true">Editar</button>
+                    </div>
+                    <div class="grid gap-2 text-sm text-slate-700 md:grid-cols-2">
+                        <p><strong>Nome:</strong> {{ $inscricao->nome_completo }}</p>
+                        <p><strong>Email:</strong> {{ $inscricao->email }}</p>
+                        <p>
+                            <strong>Email verificado:</strong>
+                            @if ($inscricao->email_verified_at)
+                                <span class="status-badge status-homologada">Verificado</span>
+                            @else
+                                <span class="status-badge status-indeferida">Não verificado</span>
+                            @endif
+                        </p>
+                        <p><strong>CPF:</strong> {{ $inscricao->cpf }}</p>
+                        <p><strong>Telefone:</strong> {{ $inscricao->telefone ?: '-' }}</p>
+                        <p><strong>Status:</strong> <span class="status-badge {{ $statusClass }}">{{ $statusLabel }}</span></p>
+                        <p><strong>Enviado em:</strong> {{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</p>
+                        <p><strong>Decidido em:</strong> {{ optional($inscricao->decided_at)->format('d/m/Y H:i') ?: '-' }}</p>
+                        <p><strong>Decidido por:</strong> {{ optional($inscricao->decidedByUser)->name ?: '-' }}</p>
+                        <p><strong>Motivo indeferimento:</strong> {{ $inscricao->indeferimento_motivo ?: '-' }}</p>
+                    </div>
+                </div>
             </div>
 
             <div x-show="tab === 'documentos'" x-transition class="space-y-4">
@@ -105,15 +125,34 @@
                     </div>
                 </div>
 
-                <div>
-                    <h3 class="text-sm font-semibold text-slate-800">Arquivos enviados</h3>
+                <div class="rounded-xl border border-slate-200 p-4">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <h3 class="text-sm font-semibold text-slate-800">Arquivos enviados</h3>
+                        <span class="text-xs text-slate-500">Use editar para substituir ou excluir arquivo</span>
+                    </div>
                     <ul class="mt-2 space-y-2">
-                        @foreach ($inscricao->documentos as $doc)
-                            <li class="flex items-center justify-between rounded-lg border border-slate-200 p-3 text-sm">
+                        @forelse ($inscricao->documentos as $doc)
+                            <li class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 text-sm">
                                 <span>{{ $doc->tipo }} ({{ $doc->original_name }})</span>
-                                <a href="{{ route('admin.inscricoes.documentos.download', [$inscricao, $doc]) }}" class="text-blue-600 hover:underline">Download</a>
+                                <div class="flex items-center gap-2">
+                                    <a href="{{ route('admin.inscricoes.documentos.download', [$inscricao, $doc]) }}" class="text-blue-600 hover:underline">Download</a>
+                                    <button type="button"
+                                            class="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                                            @click="openDocModal({{ $doc->id }}, @js($doc->tipo), @js($doc->original_name))">
+                                        Editar
+                                    </button>
+                                    <button type="button"
+                                            class="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                                            @click="openDocDelete({{ $doc->id }}, @js($doc->tipo), @js($doc->original_name))">
+                                        Excluir
+                                    </button>
+                                </div>
                             </li>
-                        @endforeach
+                        @empty
+                            <li class="rounded-lg border border-dashed border-slate-300 p-3 text-sm text-slate-500">
+                                Nenhum documento enviado.
+                            </li>
+                        @endforelse
                     </ul>
                 </div>
             </div>
@@ -201,48 +240,114 @@
             </div>
         </div>
 
-        @if ($inscricao->status === 'RECEBIDA')
-            <div class="panel-card">
-                <div class="flex flex-wrap gap-3">
-                    <button type="button" class="btn-success" :disabled="{{ $podeHomologar ? 'false' : 'true' }}" @click="modalHomologar = true">Homologar</button>
-                    <button type="button" class="btn-danger" @click="modalIndeferir = true">Indeferir</button>
-                </div>
-                @if (! $podeHomologar)
-                    <p class="mt-2 text-xs text-red-600">Só é possível homologar quando todos os documentos obrigatórios estiverem presentes.</p>
-                @endif
+        <div class="panel-card">
+            <h3 class="text-sm font-semibold text-slate-800">Controle de Status</h3>
+            <p class="mt-1 text-xs text-slate-500">Altere o status final desta inscrição a qualquer momento.</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+                <form method="POST" action="{{ route('admin.inscricoes.status', $inscricao) }}">
+                    @csrf
+                    <input type="hidden" name="status" value="RECEBIDA">
+                    <button type="submit" class="btn-muted {{ $inscricao->status === 'RECEBIDA' ? 'ring-2 ring-slate-400' : '' }}">Em Análise</button>
+                </form>
+                <form method="POST" action="{{ route('admin.inscricoes.status', $inscricao) }}">
+                    @csrf
+                    <input type="hidden" name="status" value="HOMOLOGADA">
+                    <button type="submit" class="btn-success {{ $inscricao->status === 'HOMOLOGADA' ? 'ring-2 ring-emerald-500' : '' }}">Homologada</button>
+                </form>
+                <button type="button" class="btn-danger {{ $inscricao->status === 'INDEFERIDA' ? 'ring-2 ring-red-500' : '' }}" @click="modalIndeferir = true">Indeferida</button>
             </div>
+        </div>
 
-            <div x-show="modalHomologar" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" @click.self="modalHomologar = false">
-                <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
-                    <h3 class="text-lg font-bold text-slate-900">Confirmar homologação</h3>
-                    <p class="mt-2 text-sm text-slate-600">Esta ação cria/libera o usuário aluno e marca a inscrição como homologada.</p>
-                    <div class="mt-4 flex justify-end gap-2">
-                        <button type="button" class="btn-muted" @click="modalHomologar = false">Cancelar</button>
-                        <form method="POST" action="{{ route('admin.inscricoes.homologar', $inscricao) }}">
-                            @csrf
-                            <button type="submit" class="btn-success">Confirmar</button>
-                        </form>
+        <div x-cloak x-show="modalIndeferir" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display: none;" @click.self="modalIndeferir = false">
+            <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-lg">
+                <h3 class="text-lg font-bold text-slate-900">Definir como indeferida</h3>
+                <form method="POST" action="{{ route('admin.inscricoes.status', $inscricao) }}" class="mt-3 space-y-3">
+                    @csrf
+                    <input type="hidden" name="status" value="INDEFERIDA">
+                    <div>
+                        <x-input-label for="indeferimento_motivo" value="Motivo (obrigatório)" />
+                        <textarea id="indeferimento_motivo" name="indeferimento_motivo" rows="4" class="input-base" required>{{ old('indeferimento_motivo', $inscricao->indeferimento_motivo) }}</textarea>
                     </div>
-                </div>
+                    <div class="flex justify-end gap-2">
+                        <button type="button" class="btn-muted" @click="modalIndeferir = false">Cancelar</button>
+                        <button type="submit" class="btn-danger">Confirmar</button>
+                    </div>
+                </form>
             </div>
+        </div>
 
-            <div x-show="modalIndeferir" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" @click.self="modalIndeferir = false">
-                <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-lg">
-                    <h3 class="text-lg font-bold text-slate-900">Indeferir inscrição</h3>
-                    <form method="POST" action="{{ route('admin.inscricoes.indeferir', $inscricao) }}" class="mt-3 space-y-3">
-                        @csrf
+        <div x-cloak x-show="modalDados" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display: none;" @click.self="modalDados = false">
+            <div class="w-full max-w-2xl rounded-xl bg-white p-5 shadow-lg">
+                <h3 class="text-lg font-bold text-slate-900">Editar dados da inscrição</h3>
+                <form method="POST" action="{{ route('admin.inscricoes.update', $inscricao) }}" class="mt-4 space-y-3">
+                    @csrf
+                    @method('PUT')
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <div class="md:col-span-2">
+                            <x-input-label for="nome_completo" value="Nome completo" />
+                            <x-text-input id="nome_completo" name="nome_completo" type="text" class="input-base mt-1" :value="old('nome_completo', $inscricao->nome_completo)" required />
+                        </div>
                         <div>
-                            <x-input-label for="indeferimento_motivo" value="Motivo (obrigatório)" />
-                            <textarea id="indeferimento_motivo" name="indeferimento_motivo" rows="4" class="input-base" required>{{ old('indeferimento_motivo') }}</textarea>
+                            <x-input-label for="email" value="E-mail" />
+                            <x-text-input id="email" name="email" type="email" class="input-base mt-1" :value="old('email', $inscricao->email)" required />
                         </div>
-                        <div class="flex justify-end gap-2">
-                            <button type="button" class="btn-muted" @click="modalIndeferir = false">Cancelar</button>
-                            <button type="submit" class="btn-danger">Confirmar indeferimento</button>
+                        <div>
+                            <x-input-label for="cpf" value="CPF" />
+                            <x-text-input id="cpf" name="cpf" type="text" class="input-base mt-1" :value="old('cpf', $inscricao->cpf)" required />
                         </div>
-                    </form>
-                </div>
+                        <div class="md:col-span-2">
+                            <x-input-label for="telefone" value="Telefone" />
+                            <x-text-input id="telefone" name="telefone" type="text" class="input-base mt-1" :value="old('telefone', $inscricao->telefone)" />
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button" class="btn-muted" @click="modalDados = false">Cancelar</button>
+                        <button type="submit" class="btn-primary">Salvar dados</button>
+                    </div>
+                </form>
             </div>
-        @endif
+        </div>
+
+        <div x-cloak x-show="docModal.open" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display: none;" @click.self="closeDocModal()">
+            <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-lg">
+                <h3 class="text-lg font-bold text-slate-900">Editar documento</h3>
+                <p class="mt-1 text-sm text-slate-600">
+                    <strong x-text="docModal.tipo"></strong>
+                    <span class="text-slate-400">·</span>
+                    <span x-text="docModal.originalName"></span>
+                </p>
+                <form method="POST" :action="docModal.updateUrl" enctype="multipart/form-data" class="mt-4 space-y-3">
+                    @csrf
+                    @method('PUT')
+                    <div>
+                        <x-input-label value="Novo arquivo" />
+                        <input name="arquivo" type="file" class="input-base mt-1" required>
+                        <p class="mt-1 text-xs text-slate-500">Selecione o novo arquivo para substituir o atual.</p>
+                    </div>
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button" class="btn-muted" @click="closeDocModal()">Cancelar</button>
+                        <button type="submit" class="btn-primary">Substituir arquivo</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div x-cloak x-show="docDeleteModal.open" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display: none;" @click.self="closeDocDelete()">
+            <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+                <h3 class="text-lg font-bold text-slate-900">Excluir documento</h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    Deseja realmente excluir o documento
+                    <strong x-text="docDeleteModal.tipo"></strong>
+                    (<span x-text="docDeleteModal.originalName"></span>)?
+                </p>
+                <form method="POST" :action="docDeleteModal.deleteUrl" class="mt-4 flex justify-end gap-2">
+                    @csrf
+                    @method('DELETE')
+                    <button type="button" class="btn-muted" @click="closeDocDelete()">Cancelar</button>
+                    <button type="submit" class="btn-danger">Excluir</button>
+                </form>
+            </div>
+        </div>
 
         <a href="{{ route('admin.inscricoes.index', ['edital_id' => $inscricao->edital_id]) }}" class="text-sm font-semibold text-blue-600 hover:underline">Voltar para listagem</a>
 
@@ -263,7 +368,7 @@
             <input type="hidden" name="confirm_code_input" :value="confirmModal.codeInput">
         </form>
 
-        <div x-show="editModal.open" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display: none;" @click.self="closeEditModal()">
+        <div x-cloak x-show="editModal.open" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display: none;" @click.self="closeEditModal()">
             <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-lg">
                 <h3 class="text-lg font-bold text-slate-900">Editar avaliação</h3>
                 <p class="mt-1 text-sm text-slate-600">Docente: <strong x-text="avaliacaoForm.docente_nome"></strong></p>
@@ -297,7 +402,7 @@
             </div>
         </div>
 
-        <div x-show="confirmModal.open" x-transition class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4" style="display: none;" @click.self="closeConfirmModal()">
+        <div x-cloak x-show="confirmModal.open" x-transition class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4" style="display: none;" @click.self="closeConfirmModal()">
             <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
                 <h3 class="text-lg font-bold text-slate-900">Confirmar ação</h3>
                 <p class="mt-2 text-sm text-slate-600">
@@ -318,12 +423,26 @@
     </div>
 
     <script>
-        function inscricaoAvaliacaoPage(initialAvaliacoes) {
+        function inscricaoAvaliacaoPage(initialAvaliacoes, initialTab) {
             return {
-                tab: 'dados',
-                modalHomologar: false,
+                tab: initialTab || 'dados',
                 modalIndeferir: false,
+                modalDados: false,
                 editModal: { open: false },
+                docModal: {
+                    open: false,
+                    docId: null,
+                    tipo: '',
+                    originalName: '',
+                    updateUrl: '',
+                },
+                docDeleteModal: {
+                    open: false,
+                    docId: null,
+                    tipo: '',
+                    originalName: '',
+                    deleteUrl: '',
+                },
                 avaliacaoForm: {
                     docente_id: '',
                     docente_nome: '',
@@ -339,6 +458,8 @@
                     error: '',
                 },
                 avaliacoes: Array.isArray(initialAvaliacoes) ? initialAvaliacoes : [],
+                docUpdateUrlTemplate: @js(route('admin.inscricoes.documentos.update', ['inscricao' => $inscricao, 'doc' => '__DOC__'])),
+                docDeleteUrlTemplate: @js(route('admin.inscricoes.documentos.destroy', ['inscricao' => $inscricao, 'doc' => '__DOC__'])),
                 openEdit(item) {
                     this.avaliacaoForm.docente_id = String(item.docente_id ?? '');
                     this.avaliacaoForm.docente_nome = item.docente_nome ?? '';
@@ -349,6 +470,28 @@
                 },
                 closeEditModal() {
                     this.editModal.open = false;
+                },
+                openDocModal(docId, tipo, originalName) {
+                    this.docModal.docId = docId;
+                    this.docModal.tipo = tipo || '';
+                    this.docModal.originalName = originalName || '';
+                    this.docModal.updateUrl = this.docUpdateUrlTemplate.replace('__DOC__', String(docId));
+                    this.docModal.open = true;
+                },
+                closeDocModal() {
+                    this.docModal.open = false;
+                    this.docModal.updateUrl = '';
+                },
+                openDocDelete(docId, tipo, originalName) {
+                    this.docDeleteModal.docId = docId;
+                    this.docDeleteModal.tipo = tipo || '';
+                    this.docDeleteModal.originalName = originalName || '';
+                    this.docDeleteModal.deleteUrl = this.docDeleteUrlTemplate.replace('__DOC__', String(docId));
+                    this.docDeleteModal.open = true;
+                },
+                closeDocDelete() {
+                    this.docDeleteModal.open = false;
+                    this.docDeleteModal.deleteUrl = '';
                 },
                 requestConfirm(action) {
                     this.confirmModal.action = action;

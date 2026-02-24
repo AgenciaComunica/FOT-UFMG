@@ -61,6 +61,74 @@
             </form>
         </section>
 
+        @if ($isAprovadorNoEdital)
+            <section class="panel-card space-y-4">
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900">Avaliações da banca</h3>
+                    <p class="text-xs text-slate-500">Visualização disponível somente para docente aprovador deste edital.</p>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table-base">
+                        <thead>
+                            <tr>
+                                <th>Docente</th>
+                                <th>Status</th>
+                                <th>Nota</th>
+                                <th>Avaliação Subjetiva</th>
+                                <th>Comentário</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($inscricao->edital->docentesBanca as $docenteBanca)
+                                @php
+                                    $avaliacaoDocente = $inscricao->avaliacoes->firstWhere('docente_id', $docenteBanca->id);
+                                    $statusDocente = $avaliacaoDocente && $avaliacaoDocente->nota !== null ? 'AVALIADO' : 'PENDENTE';
+                                @endphp
+                                <tr>
+                                    <td>{{ $docenteBanca->name }}</td>
+                                    <td>
+                                        <span class="status-badge {{ $statusDocente === 'AVALIADO' ? 'status-homologada' : 'bg-blue-100 text-blue-700' }}">
+                                            {{ $statusDocente }}
+                                        </span>
+                                    </td>
+                                    <td>{{ $avaliacaoDocente && $avaliacaoDocente->nota !== null ? number_format((float) $avaliacaoDocente->nota, 2, ',', '.') : '-' }}</td>
+                                    <td>{{ $avaliacaoDocente?->avaliacao_subjetiva ?: '-' }}</td>
+                                    <td>{{ $avaliacaoDocente?->comentario ?: '-' }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="text-slate-500">Sem docentes na banca.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 p-4">
+                    <h4 class="text-sm font-semibold text-slate-800">Veredito final da inscrição</h4>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <form method="POST" action="{{ route('docente.inscricoes.status', $inscricao) }}">
+                            @csrf
+                            <input type="hidden" name="status" value="RECEBIDA">
+                            <button type="submit" class="btn-muted {{ $inscricao->status === 'RECEBIDA' ? 'ring-2 ring-slate-400' : '' }}">Em Análise</button>
+                        </form>
+                        <form method="POST" action="{{ route('docente.inscricoes.status', $inscricao) }}">
+                            @csrf
+                            <input type="hidden" name="status" value="HOMOLOGADA">
+                            <button type="submit" class="btn-success {{ $inscricao->status === 'HOMOLOGADA' ? 'ring-2 ring-emerald-500' : '' }}">Homologada</button>
+                        </form>
+                        <form method="POST" action="{{ route('docente.inscricoes.status', $inscricao) }}" class="flex flex-wrap items-center gap-2">
+                            @csrf
+                            <input type="hidden" name="status" value="INDEFERIDA">
+                            <input type="text" name="indeferimento_motivo" class="input-base w-72" placeholder="Motivo do indeferimento" required>
+                            <button type="submit" class="btn-danger {{ $inscricao->status === 'INDEFERIDA' ? 'ring-2 ring-red-500' : '' }}">Indeferida</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        @endif
+
         <section class="panel-card">
             <div class="mb-4 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
                 <button type="button" @click="tab = 'dados'" class="rounded-lg px-3 py-2 text-sm font-semibold" :class="tab === 'dados' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'">Dados</button>

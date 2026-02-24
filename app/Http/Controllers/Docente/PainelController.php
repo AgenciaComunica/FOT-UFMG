@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PainelController extends Controller
@@ -37,6 +38,8 @@ class PainelController extends Controller
 
         $query = Inscricao::query()
             ->with(['edital', 'avaliacoes' => fn ($q) => $q->where('docente_id', $user->id)])
+            ->where('status', Inscricao::STATUS_RECEBIDA)
+            ->whereNotNull('email_verified_at')
             ->whereHas('edital.docentesBanca', fn ($q) => $q->where('users.id', $user->id))
             ->when($editalId > 0, fn ($q) => $q->where('edital_id', $editalId))
             ->when($dateStart && $dateEnd, function ($q) use ($user, $dateStart, $dateEnd) {
@@ -117,12 +120,19 @@ class PainelController extends Controller
     {
         $user = $request->user();
         $this->assertPodeAvaliar($inscricao, $user->id);
+        $isAprovador = $this->isAprovadorNoEdital($inscricao, $user->id);
 
         $inscricao->load([
             'edital.documentosRequeridos',
             'documentos',
             'avaliacoes' => fn ($q) => $q->where('docente_id', $user->id),
         ]);
+        if ($isAprovador) {
+            $inscricao->load([
+                'avaliacoes.docente',
+                'edital.docentesBanca:id,name',
+            ]);
+        }
 
         $avaliacao = $inscricao->avaliacoes->first();
         $statusAvaliacao = $avaliacao && $avaliacao->nota !== null ? 'AVALIADO' : 'PENDENTE';
@@ -131,6 +141,7 @@ class PainelController extends Controller
             'inscricao' => $inscricao,
             'avaliacao' => $avaliacao,
             'statusAvaliacao' => $statusAvaliacao,
+            'isAprovadorNoEdital' => $isAprovador,
         ]);
     }
 
@@ -181,12 +192,78 @@ class PainelController extends Controller
         return Storage::disk('local')->download($doc->arquivo_path, $doc->original_name);
     }
 
+    public function definirVereditoFinal(Request $request, Inscricao $inscricao): RedirectResponse
+    {
+        $user = $request->user();
+        $this->assertPodeAvaliar($inscricao, $user->id);
+        $this->assertPodeDefinirVeredito($inscricao, $user->id);
+
+        $data = $request->validate([
+            'status' => ['required', 'in:RECEBIDA,HOMOLOGADA,INDEFERIDA'],
+            'indeferimento_motivo' => ['nullable', 'string', 'max:4000'],
+        ], [
+            'status.required' => 'Selecione um status válido.',
+            'status.in' => 'Status inválido.',
+        ]);
+
+        if ($data['status'] === Inscricao::STATUS_INDEFERIDA && ! filled($data['indeferimento_motivo'] ?? null)) {
+            throw ValidationException::withMessages([
+                'indeferimento_motivo' => 'O motivo é obrigatório para definir como indeferida.',
+            ]);
+        }
+
+        if ($data['status'] === Inscricao::STATUS_RECEBIDA) {
+            $inscricao->forceFill([
+                'status' => Inscricao::STATUS_RECEBIDA,
+                'decided_at' => null,
+                'decided_by' => null,
+                'indeferimento_motivo' => null,
+            ])->save();
+        } elseif ($data['status'] === Inscricao::STATUS_HOMOLOGADA) {
+            $inscricao->forceFill([
+                'status' => Inscricao::STATUS_HOMOLOGADA,
+                'decided_at' => now(),
+                'decided_by' => $user->id,
+                'indeferimento_motivo' => null,
+            ])->save();
+        } else {
+            $inscricao->forceFill([
+                'status' => Inscricao::STATUS_INDEFERIDA,
+                'decided_at' => now(),
+                'decided_by' => $user->id,
+                'indeferimento_motivo' => trim((string) $data['indeferimento_motivo']),
+            ])->save();
+        }
+
+        return redirect()
+            ->route('docente.inscricoes.show', $inscricao)
+            ->with('status', 'Veredito final atualizado com sucesso.');
+    }
+
     private function assertPodeAvaliar(Inscricao $inscricao, int $docenteId): void
     {
+        if ($inscricao->status !== Inscricao::STATUS_RECEBIDA || $inscricao->email_verified_at === null) {
+            abort(403);
+        }
+
         $ok = $inscricao->edital()
             ->whereHas('docentesBanca', fn ($q) => $q->where('users.id', $docenteId))
             ->exists();
 
         abort_unless($ok, 403);
+    }
+
+    private function isAprovadorNoEdital(Inscricao $inscricao, int $docenteId): bool
+    {
+        return $inscricao->edital()
+            ->whereHas('docentesBanca', fn ($q) => $q
+                ->where('users.id', $docenteId)
+                ->where('edital_docentes.aprovador', true))
+            ->exists();
+    }
+
+    private function assertPodeDefinirVeredito(Inscricao $inscricao, int $docenteId): void
+    {
+        abort_unless($this->isAprovadorNoEdital($inscricao, $docenteId), 403);
     }
 }

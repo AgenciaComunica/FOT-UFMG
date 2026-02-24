@@ -27,7 +27,8 @@ class AdminStoreEditalRequest extends FormRequest
             'periodo_inscricao_inicio' => ['required', 'date'],
             'periodo_inscricao_fim' => ['required', 'date', 'after_or_equal:periodo_inscricao_inicio'],
             'banca_docentes' => ['nullable', 'array'],
-            'banca_docentes.*' => ['nullable', 'integer', 'exists:users,id'],
+            'banca_docentes.*.user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'banca_docentes.*.aprovador' => ['nullable', 'boolean'],
             'documentos_requeridos' => ['nullable', 'array'],
             'documentos_requeridos.*.tipo' => ['required_with:documentos_requeridos', 'string', 'max:120'],
             'documentos_requeridos.*.formatos_aceitos' => ['required_with:documentos_requeridos', 'array', 'min:1'],
@@ -58,7 +59,7 @@ class AdminStoreEditalRequest extends FormRequest
             'numero_vagas.required_if' => 'Informe o número de vagas.',
             'numero_vagas.integer' => 'O número de vagas deve ser um número inteiro.',
             'numero_vagas.min' => 'O número de vagas deve ser no mínimo 1.',
-            'banca_docentes.*.exists' => 'Selecione apenas docentes válidos para a banca.',
+            'banca_docentes.*.user_id.exists' => 'Selecione apenas docentes válidos para a banca.',
             'documentos_requeridos.*.tipo.required' => 'Informe o nome de cada documento.',
             'documentos_requeridos.*.formatos_aceitos.required' => 'Selecione ao menos um formato aceito para cada documento.',
             'documentos_requeridos.*.formatos_aceitos.min' => 'Selecione ao menos um formato aceito para cada documento.',
@@ -79,6 +80,7 @@ class AdminStoreEditalRequest extends FormRequest
             }
 
             $docentesIds = collect($this->input('banca_docentes', []))
+                ->map(fn ($item) => is_array($item) ? ($item['user_id'] ?? null) : null)
                 ->filter(fn ($id) => filled($id))
                 ->map(fn ($id) => (int) $id)
                 ->values();

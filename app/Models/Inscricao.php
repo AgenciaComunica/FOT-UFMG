@@ -25,6 +25,10 @@ class Inscricao extends Model
         'email',
         'cpf',
         'telefone',
+        'email_verification_token',
+        'verification_sent_at',
+        'email_verified_at',
+        'resultado_email_sent_at',
         'status',
         'submitted_at',
         'decided_at',
@@ -37,7 +41,15 @@ class Inscricao extends Model
         return [
             'submitted_at' => 'datetime',
             'decided_at' => 'datetime',
+            'verification_sent_at' => 'datetime',
+            'email_verified_at' => 'datetime',
+            'resultado_email_sent_at' => 'datetime',
         ];
+    }
+
+    public function isEmailVerified(): bool
+    {
+        return $this->email_verified_at !== null;
     }
 
     public function edital(): BelongsTo
