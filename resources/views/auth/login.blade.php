@@ -2,11 +2,14 @@
     <div class="mx-auto w-full max-w-[450px] rounded-3xl border border-white/70 bg-white/85 p-6 shadow-2xl backdrop-blur-xl">
         <div class="mb-4 border-b border-slate-200 pb-4">
             <div class="flex flex-col gap-3">
+                <div class="flex justify-end">
+                    <a href="{{ route('home') }}" class="btn-primary">Voltar para Editais</a>
+                </div>
                 <img src="{{ asset('images/Logo-FTO.png') }}" alt="Logo FOT-UFMG" class="w-[400px] h-auto">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Área interna</p>
                     <h1 class="mt-1 text-2xl font-extrabold text-slate-900">Entrar na plataforma</h1>
-                    <p class="mt-1 text-sm text-slate-600">Acesso exclusivo para secretaria e alunos aprovados.</p>
+                    <p class="mt-1 text-sm text-slate-600">Acesso exclusivo para secretaria e docentes.</p>
                 </div>
             </div>
         </div>
@@ -49,10 +52,7 @@
         </form>
 
         <p class="mt-5 text-center text-xs text-slate-500">
-            Não tem login ainda?
-            <a href="{{ route('home') }}" class="font-semibold text-sky-700 hover:text-sky-600">
-                Faça sua inscrição
-            </a>
+            Consulte os editais e faça sua inscrição na página pública.
         </p>
     </div>
 </x-guest-layout>

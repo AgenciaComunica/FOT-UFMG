@@ -15,57 +15,59 @@
             <div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first('edital') }}</div>
         @endif
 
-        <form
-            method="GET"
-            class="panel-card grid gap-3 md:grid-cols-2 md:items-end"
-            x-ref="graficoForm"
-        >
-            <input type="hidden" name="q" value="{{ $q }}">
-            <input type="hidden" name="status" value="{{ $status }}">
-            <input type="hidden" name="cards_inicio" value="{{ $cardsInicio }}">
-            <input type="hidden" name="cards_fim" value="{{ $cardsFim }}">
-            <input type="hidden" name="per_page" value="{{ $perPage }}">
+        <section class="panel-card space-y-4">
+            <form
+                method="GET"
+                class="grid gap-3 border-b border-slate-200 pb-4 md:grid-cols-2 md:items-end"
+                x-ref="graficoForm"
+            >
+                <input type="hidden" name="q" value="{{ $q }}">
+                <input type="hidden" name="status" value="{{ $status }}">
+                <input type="hidden" name="cards_inicio" value="{{ $cardsInicio }}">
+                <input type="hidden" name="cards_fim" value="{{ $cardsFim }}">
+                <input type="hidden" name="per_page" value="{{ $perPage }}">
 
-            <div>
-                <x-input-label for="grafico_edital_id" value="Edital (gráficos)" />
-                <select id="grafico_edital_id" name="grafico_edital_id" class="input-base" @change="$refs.graficoForm.submit()">
-                    @foreach ($graficoEditais as $editalGrafico)
-                        <option value="{{ $editalGrafico->id }}" @selected($graficoEditalId === $editalGrafico->id)>{{ $editalGrafico->titulo }}</option>
-                    @endforeach
-                </select>
+                <div>
+                    <x-input-label for="grafico_edital_id" value="Edital (gráficos)" />
+                    <select id="grafico_edital_id" name="grafico_edital_id" class="input-base" @change="$refs.graficoForm.submit()">
+                        @foreach ($graficoEditais as $editalGrafico)
+                            <option value="{{ $editalGrafico->id }}" @selected($graficoEditalId === $editalGrafico->id)>{{ $editalGrafico->titulo }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                @if ($graficoFiltroAlterado)
+                    <div class="flex items-end">
+                        <a href="{{ route('admin.painel') }}" class="btn-muted">Limpar filtro</a>
+                    </div>
+                @endif
+            </form>
+
+            <div class="grid gap-4 lg:grid-cols-3">
+                <section class="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2">
+                    <div class="mb-3">
+                        <h3 class="text-base font-semibold text-slate-900">
+                            Curva de inscrições ({{ optional($graficoEditais->firstWhere('id', $graficoEditalId))->titulo ?? 'Edital selecionado' }})
+                        </h3>
+                        <p class="text-xs text-slate-500">
+                            A curva considera o período selecionado no filtro acima
+                            (escala: {{ $graficoGranularidade === 'ano' ? 'anual' : ($graficoGranularidade === 'mes' ? 'mensal' : 'diária') }}).
+                        </p>
+                    </div>
+                    <div id="chart-inscricoes-tempo" class="min-h-[280px]"></div>
+                </section>
+
+                <section class="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-1">
+                    <div class="mb-3">
+                        <h3 class="text-base font-semibold text-slate-900">Proporção por status de inscrição</h3>
+                    </div>
+                    <div id="chart-inscricoes-status" class="min-h-[280px]"></div>
+                </section>
             </div>
+        </section>
 
-            @if ($graficoFiltroAlterado)
-                <div class="flex items-end">
-                    <a href="{{ route('admin.painel') }}" class="btn-muted">Limpar filtro</a>
-                </div>
-            @endif
-        </form>
-
-        <div class="grid gap-4 lg:grid-cols-3">
-            <section class="panel-card lg:col-span-2">
-                <div class="mb-3">
-                    <h3 class="text-base font-semibold text-slate-900">
-                        Curva de inscrições ({{ optional($graficoEditais->firstWhere('id', $graficoEditalId))->titulo ?? 'Edital selecionado' }})
-                    </h3>
-                    <p class="text-xs text-slate-500">
-                        A curva considera o período selecionado no filtro acima
-                        (escala: {{ $graficoGranularidade === 'ano' ? 'anual' : ($graficoGranularidade === 'mes' ? 'mensal' : 'diária') }}).
-                    </p>
-                </div>
-                <div id="chart-inscricoes-tempo" class="min-h-[280px]"></div>
-            </section>
-
-            <section class="panel-card lg:col-span-1">
-                <div class="mb-3">
-                    <h3 class="text-base font-semibold text-slate-900">Proporção por status de inscrição</h3>
-                </div>
-                <div id="chart-inscricoes-status" class="min-h-[280px]"></div>
-            </section>
-        </div>
-
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <form method="GET" x-data="rangeCardsFilter(@js($cardsInicio), @js($cardsFim))" class="w-full space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" x-ref="filterForm">
+        <section x-data="rangeCardsFilter(@js($cardsInicio), @js($cardsFim))" class="panel-card space-y-4">
+            <form method="GET" class="space-y-3 border-b border-slate-200 pb-4" x-ref="filterForm">
                 <input type="hidden" name="grafico_edital_id" value="{{ $graficoEditalId }}">
                 <input type="hidden" name="cards_inicio" x-model="startDate">
                 <input type="hidden" name="cards_fim" x-model="endDate">
@@ -101,24 +103,34 @@
                     </div>
 
                     <div class="mt-3 flex items-end justify-end md:mt-0 md:pb-[2px]">
-                        <div class="flex gap-2">
-                            @if ($cardsFiltroAlterado)
-                                <a href="{{ route('admin.painel', ['grafico_edital_id' => $graficoEditalId, 'per_page' => $perPage]) }}" class="btn-muted whitespace-nowrap">Limpar filtro</a>
-                            @endif
-                            <a href="{{ route('admin.editais.create') }}" class="btn-primary whitespace-nowrap">+ Novo Edital</a>
-                        </div>
+                        @if ($cardsFiltroAlterado)
+                            <a href="{{ route('admin.painel', ['grafico_edital_id' => $graficoEditalId, 'per_page' => $perPage]) }}" class="btn-muted whitespace-nowrap">Limpar filtro</a>
+                        @endif
                     </div>
                 </div>
             </form>
-        </div>
 
-        @if ($editais->isEmpty())
-            <div class="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600 shadow-sm">
-                Nenhum edital encontrado com os filtros atuais.
-            </div>
-        @else
-            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <a
+                    href="{{ route('admin.editais.create') }}"
+                    class="group flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-dashed border-blue-300 bg-blue-50/60 p-5 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-50"
+                >
+                    <span class="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition group-hover:scale-105">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                        </svg>
+                    </span>
+                    <p class="text-base font-semibold text-blue-800">Adicionar Edital</p>
+                    <p class="mt-1 text-sm text-blue-700">Clique para criar um novo edital.</p>
+                </a>
+
+                @if ($editais->isEmpty())
+                    <div class="flex min-h-[280px] items-center justify-center rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600 shadow-sm sm:col-span-1 xl:col-span-2">
+                        Nenhum edital encontrado com os filtros atuais.
+                    </div>
+                @endif
+
+                @if ($editais->isNotEmpty())
                     @foreach ($editais as $edital)
                         @php
                             $badgeClass = match($edital->status) {
@@ -229,45 +241,45 @@
                             </div>
                         </article>
                     @endforeach
-                </div>
+                @endif
+            </div>
 
-                <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3">
-                    <form method="GET" class="flex items-center gap-2">
-                        <input type="hidden" name="q" value="{{ $q }}">
-                        <input type="hidden" name="status" value="{{ $status }}">
-                        <input type="hidden" name="grafico_edital_id" value="{{ $graficoEditalId }}">
-                        <input type="hidden" name="cards_inicio" value="{{ $cardsInicio }}">
-                        <input type="hidden" name="cards_fim" value="{{ $cardsFim }}">
-                        <label for="per_page_bottom" class="text-sm text-slate-600">Itens por página</label>
-                        <select id="per_page_bottom" name="per_page" class="rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
-                            @foreach ($perPageOptions as $option)
-                                <option value="{{ $option }}" @selected((string) $perPage === (string) $option)>
-                                    {{ $option === 'all' ? 'Todos' : $option }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </form>
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3">
+                <form method="GET" class="flex items-center gap-2">
+                    <input type="hidden" name="q" value="{{ $q }}">
+                    <input type="hidden" name="status" value="{{ $status }}">
+                    <input type="hidden" name="grafico_edital_id" value="{{ $graficoEditalId }}">
+                    <input type="hidden" name="cards_inicio" value="{{ $cardsInicio }}">
+                    <input type="hidden" name="cards_fim" value="{{ $cardsFim }}">
+                    <label for="per_page_bottom" class="text-sm text-slate-600">Itens por página</label>
+                    <select id="per_page_bottom" name="per_page" class="rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
+                        @foreach ($perPageOptions as $option)
+                            <option value="{{ $option }}" @selected((string) $perPage === (string) $option)>
+                                {{ $option === 'all' ? 'Todos' : $option }}
+                            </option>
+                        @endforeach
+                    </select>
+                </form>
 
-                    <div class="flex items-center gap-2">
-                        @if ($editais->previousPageUrl())
-                            <a href="{{ $editais->previousPageUrl() }}" class="btn-muted">Anterior</a>
-                        @else
-                            <span class="btn-muted cursor-not-allowed opacity-50">Anterior</span>
-                        @endif
+                <div class="flex items-center gap-2">
+                    @if ($editais->previousPageUrl())
+                        <a href="{{ $editais->previousPageUrl() }}" class="btn-muted">Anterior</a>
+                    @else
+                        <span class="btn-muted cursor-not-allowed opacity-50">Anterior</span>
+                    @endif
 
-                        <span class="text-sm text-slate-600">
-                            Página {{ $editais->currentPage() }} de {{ max(1, $editais->lastPage()) }}
-                        </span>
+                    <span class="text-sm text-slate-600">
+                        Página {{ $editais->currentPage() }} de {{ max(1, $editais->lastPage()) }}
+                    </span>
 
-                        @if ($editais->nextPageUrl())
-                            <a href="{{ $editais->nextPageUrl() }}" class="btn-muted">Próximo</a>
-                        @else
-                            <span class="btn-muted cursor-not-allowed opacity-50">Próximo</span>
-                        @endif
-                    </div>
+                    @if ($editais->nextPageUrl())
+                        <a href="{{ $editais->nextPageUrl() }}" class="btn-muted">Próximo</a>
+                    @else
+                        <span class="btn-muted cursor-not-allowed opacity-50">Próximo</span>
+                    @endif
                 </div>
             </div>
-        @endif
+        </section>
 
         <div
             x-show="open"

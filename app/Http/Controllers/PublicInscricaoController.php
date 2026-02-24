@@ -15,6 +15,8 @@ class PublicInscricaoController extends Controller
 {
     public function create(Edital $edital): View
     {
+        abort_unless($edital->isAberto(), 404);
+
         $edital->load('documentosRequeridos');
 
         return view('public.inscricao.create', [

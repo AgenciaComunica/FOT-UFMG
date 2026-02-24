@@ -6,27 +6,19 @@ use App\Http\Controllers\Admin\DocenteController as AdminDocenteController;
 use App\Http\Controllers\Aluno\PainelController;
 use App\Http\Controllers\DashboardRedirectController;
 use App\Http\Controllers\Docente\PainelController as DocentePainelController;
+use App\Http\Controllers\PublicPortalController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicInscricaoController;
-use App\Models\Edital;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    $editalAberto = Edital::query()
-        ->where('publicado', true)
-        ->where('periodo_inscricao_inicio', '<=', now())
-        ->where('periodo_inscricao_fim', '>=', now())
-        ->orderByDesc('periodo_inscricao_inicio')
-        ->first();
-
-    return view('welcome', [
-        'editalAberto' => $editalAberto,
-    ]);
-})->name('home');
+Route::get('/', [PublicPortalController::class, 'index'])->name('home');
+Route::post('/inscricoes/verificar', [PublicPortalController::class, 'verificarInscricao'])
+    ->middleware('throttle:8,1')
+    ->name('public.inscricoes.verificar');
 
 Route::get('/editais/{edital}/inscricao', [PublicInscricaoController::class, 'create'])->name('public.inscricao.create');
-Route::get('/editais/{edital}/arquivo', [AdminEditalController::class, 'downloadArquivo'])->name('public.editais.download');
+Route::get('/editais/{edital}/arquivo', [PublicPortalController::class, 'downloadEdital'])->name('public.editais.download');
 Route::post('/editais/{edital}/inscricao', [PublicInscricaoController::class, 'store'])
     ->middleware('throttle:10,60')
     ->name('public.inscricao.store');
