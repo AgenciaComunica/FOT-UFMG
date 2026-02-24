@@ -17,6 +17,7 @@ class EditalFactory extends Factory
         return [
             'titulo' => 'Edital '.fake()->year(),
             'descricao' => fake()->sentence(),
+            'publicado' => true,
             'periodo_inscricao_inicio' => now()->subDay(),
             'periodo_inscricao_fim' => now()->addDays(15)->setTime(23, 59),
         ];

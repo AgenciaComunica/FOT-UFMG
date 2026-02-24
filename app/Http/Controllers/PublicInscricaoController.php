@@ -27,8 +27,10 @@ class PublicInscricaoController extends Controller
     public function store(PublicStoreInscricaoRequest $request, Edital $edital): RedirectResponse
     {
         $validated = $request->validated();
+        $edital->loadMissing('documentosRequeridos');
+        $docsById = $edital->documentosRequeridos->keyBy('id');
 
-        $inscricao = DB::transaction(function () use ($request, $validated, $edital): Inscricao {
+        $inscricao = DB::transaction(function () use ($request, $validated, $edital, $docsById): Inscricao {
             $inscricao = Inscricao::create([
                 'edital_id' => $edital->id,
                 'protocolo' => (string) Str::uuid(),
@@ -40,21 +42,33 @@ class PublicInscricaoController extends Controller
                 'submitted_at' => now(),
             ]);
 
-            foreach ($request->file('documentos', []) as $tipo => $file) {
+            foreach ($request->file('documentos', []) as $docId => $file) {
                 if (! $file) {
                     continue;
                 }
 
-                $fileName = $tipo.'.pdf';
+                $docConfig = $docsById->get((int) $docId);
+                if (! $docConfig) {
+                    continue;
+                }
+
+                $allowed = $docConfig->formatos_aceitos;
+                $defaultExt = $allowed[0] ?? 'pdf';
+                $extension = strtolower($file->getClientOriginalExtension() ?: $defaultExt);
+                if ($extension === 'jpeg') {
+                    $extension = 'jpg';
+                }
+                $safeTipo = Str::slug($docConfig->tipo, '_');
+                $fileName = 'doc_'.$docConfig->id.'_'.$safeTipo.'.'.$extension;
                 $directory = 'inscricoes/'.$inscricao->id;
 
                 Storage::disk('local')->putFileAs($directory, $file, $fileName);
 
                 $inscricao->documentos()->create([
-                    'tipo' => $tipo,
+                    'tipo' => $docConfig->tipo,
                     'arquivo_path' => $directory.'/'.$fileName,
                     'original_name' => $file->getClientOriginalName(),
-                    'mime' => $file->getMimeType() ?? 'application/pdf',
+                    'mime' => $file->getMimeType() ?? 'application/octet-stream',
                     'size' => $file->getSize(),
                     'uploaded_at' => now(),
                 ]);

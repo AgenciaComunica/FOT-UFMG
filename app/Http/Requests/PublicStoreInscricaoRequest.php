@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use App\Models\Edital;
-use App\Models\InscricaoDocumento;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -23,14 +22,8 @@ class PublicStoreInscricaoRequest extends FormRequest
             'email' => ['required', 'email', 'max:255'],
             'cpf' => ['required', 'string', 'max:20'],
             'telefone' => ['nullable', 'string', 'max:30'],
-            'documentos' => ['required', 'array'],
-            'documentos.*' => [
-                'nullable',
-                'file',
-                'mimes:pdf',
-                'mimetypes:application/pdf,application/x-pdf',
-                'max:'.$maxPdfKb,
-            ],
+            'documentos' => ['nullable', 'array'],
+            'documentos.*' => ['nullable', 'file', 'max:'.$maxPdfKb],
         ];
     }
 
@@ -51,21 +44,58 @@ class PublicStoreInscricaoRequest extends FormRequest
                 return;
             }
 
-            $requiredTipos = $edital->documentosRequeridos
-                ->where('obrigatorio', true)
-                ->pluck('tipo');
+            $edital->loadMissing('documentosRequeridos');
+            $requiredDocs = $edital->documentosRequeridos->where('obrigatorio', true);
 
-            foreach ($requiredTipos as $tipo) {
-                if (! $this->hasFile('documentos.'.$tipo)) {
-                    $validator->errors()->add('documentos.'.$tipo, 'Documento obrigatório não enviado.');
+            foreach ($requiredDocs as $doc) {
+                if (! $this->hasFile('documentos.'.$doc->id)) {
+                    $validator->errors()->add('documentos.'.$doc->id, 'Documento obrigatório não enviado.');
                 }
             }
 
-            $invalidTipos = collect(array_keys($this->file('documentos', [])))
-                ->filter(fn (string $tipo): bool => ! in_array($tipo, InscricaoDocumento::TIPOS, true));
+            $docsById = $edital->documentosRequeridos->keyBy('id');
+            $uploaded = collect($this->file('documentos', []));
+            $invalidIds = $uploaded->keys()->filter(fn ($id): bool => ! $docsById->has((int) $id));
 
-            if ($invalidTipos->isNotEmpty()) {
-                $validator->errors()->add('documentos', 'Tipo de documento inválido enviado.');
+            if ($invalidIds->isNotEmpty()) {
+                $validator->errors()->add('documentos', 'Documento inválido enviado.');
+            }
+
+            foreach ($uploaded as $docId => $file) {
+                if (! $file) {
+                    continue;
+                }
+
+                $doc = $docsById->get((int) $docId);
+                if (! $doc) {
+                    continue;
+                }
+
+                $formatosAceitos = $doc->formatos_aceitos;
+                $extensao = strtolower((string) $file->getClientOriginalExtension());
+                if ($extensao === 'jpeg') {
+                    $extensao = 'jpg';
+                }
+
+                if (! in_array($extensao, $formatosAceitos, true)) {
+                    $validator->errors()->add('documentos.'.$docId, 'Formato inválido. Permitidos: '.strtoupper(implode(', ', $formatosAceitos)).'.');
+                    continue;
+                }
+
+                $mime = (string) $file->getMimeType();
+                $mimeValidoPorExt = [
+                    'pdf' => ['application/pdf', 'application/x-pdf'],
+                    'docx' => [
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        'application/zip',
+                    ],
+                    'jpg' => ['image/jpeg', 'image/jpg'],
+                    'png' => ['image/png'],
+                ];
+
+                if (isset($mimeValidoPorExt[$extensao]) && ! in_array($mime, $mimeValidoPorExt[$extensao], true)) {
+                    $validator->errors()->add('documentos.'.$docId, 'MIME inválido para o formato enviado.');
+                }
             }
         });
     }

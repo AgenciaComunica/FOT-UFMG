@@ -36,7 +36,7 @@
                     class="rounded-lg px-3 py-2 text-left text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
                     :class="step === 2 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
                 >
-                    2. Documentos PDF
+                    2. Documentos
                 </button>
             </div>
         </div>
@@ -93,6 +93,16 @@
                     @foreach ($edital->documentosRequeridos as $doc)
                         @php
                             $defaultBadgeClass = $doc->obrigatorio ? 'status-indeferida' : 'status-recebida';
+                            $acceptMap = [
+                                'pdf' => '.pdf,application/pdf',
+                                'docx' => '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                'jpg' => '.jpg,.jpeg,image/jpeg',
+                                'png' => '.png,image/png',
+                            ];
+                            $accept = collect($doc->formatos_aceitos)
+                                ->map(fn ($ext) => $acceptMap[$ext] ?? null)
+                                ->filter()
+                                ->implode(',');
                         @endphp
                         <div class="rounded-lg border border-slate-200 p-3" x-data="{ fileName: 'Nenhum arquivo selecionado', hasFile: false }">
                             <div class="flex flex-wrap items-center gap-2">
@@ -113,7 +123,7 @@
                                 <p class="truncate px-3 text-xs text-slate-600" x-text="fileName"></p>
 
                                 <label
-                                    for="{{ 'documentos_'.$doc->tipo }}"
+                                    for="{{ 'documentos_'.$doc->id }}"
                                     class="inline-flex cursor-pointer items-center rounded-r-lg border-l px-4 py-2.5 text-xs font-semibold text-white transition"
                                     :class="hasFile ? 'border-emerald-700 bg-emerald-600 hover:bg-emerald-700' : 'border-blue-700 bg-blue-600 hover:bg-blue-700'"
                                     title="Adicionar arquivo"
@@ -130,15 +140,15 @@
                             </div>
 
                             <input
-                                id="{{ 'documentos_'.$doc->tipo }}"
-                                name="documentos[{{ $doc->tipo }}]"
+                                id="{{ 'documentos_'.$doc->id }}"
+                                name="documentos[{{ $doc->id }}]"
                                 type="file"
-                                accept="application/pdf"
+                                accept="{{ $accept }}"
                                 class="sr-only"
                                 @change="hasFile = $event.target.files.length > 0; fileName = hasFile ? $event.target.files[0].name : 'Nenhum arquivo selecionado'"
                                 @if($doc->obrigatorio) required @endif
                             >
-                            <p class="mt-1 text-xs text-slate-500">Apenas PDF. Máximo: {{ (int) ($maxPdfKb / 1024) }} MB.</p>
+                            <p class="mt-1 text-xs text-slate-500">Formatos: {{ strtoupper(implode(', ', $doc->formatos_aceitos)) }}. Máximo: {{ (int) ($maxPdfKb / 1024) }} MB.</p>
                         </div>
                     @endforeach
                 </div>

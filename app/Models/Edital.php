@@ -15,15 +15,22 @@ class Edital extends Model
     protected $fillable = [
         'titulo',
         'descricao',
+        'publicado',
         'periodo_inscricao_inicio',
         'periodo_inscricao_fim',
+        'arquivo_path',
+        'arquivo_original_name',
+        'arquivo_mime',
+        'arquivo_size',
     ];
 
     protected function casts(): array
     {
         return [
+            'publicado' => 'boolean',
             'periodo_inscricao_inicio' => 'datetime',
             'periodo_inscricao_fim' => 'datetime',
+            'arquivo_size' => 'integer',
         ];
     }
 
@@ -39,6 +46,10 @@ class Edital extends Model
 
     public function getStatusAttribute(): string
     {
+        if (! $this->publicado) {
+            return 'RASCUNHO';
+        }
+
         $now = now();
 
         if ($now->lt($this->periodo_inscricao_inicio)) {
@@ -55,5 +66,10 @@ class Edital extends Model
     public function isAberto(): bool
     {
         return $this->status === 'ABERTO';
+    }
+
+    public function hasArquivoEdital(): bool
+    {
+        return filled($this->arquivo_path);
     }
 }

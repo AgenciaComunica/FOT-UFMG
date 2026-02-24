@@ -20,7 +20,7 @@ class InscricaoFlowTest extends TestCase
         Storage::fake('local');
 
         $editalAberto = $this->createEditalAberto();
-        $payload = $this->payloadInscricaoCompleta();
+        $payload = $this->payloadInscricaoCompleta($editalAberto);
 
         $responseOk = $this->post(route('public.inscricao.store', $editalAberto), $payload);
         $responseOk->assertRedirect();
@@ -38,7 +38,7 @@ class InscricaoFlowTest extends TestCase
         $this->attachDocumentosRequeridos($editalFechado);
 
         $responseClosed = $this->from(route('public.inscricao.create', $editalFechado))
-            ->post(route('public.inscricao.store', $editalFechado), $this->payloadInscricaoCompleta('fechado@example.com'));
+            ->post(route('public.inscricao.store', $editalFechado), $this->payloadInscricaoCompleta($editalFechado, 'fechado@example.com'));
 
         $responseClosed->assertRedirect(route('public.inscricao.create', $editalFechado));
         $responseClosed->assertSessionHasErrors('edital');
@@ -209,12 +209,12 @@ class InscricaoFlowTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function payloadInscricaoCompleta(string $email = 'aluno@example.com'): array
+    private function payloadInscricaoCompleta(Edital $edital, string $email = 'aluno@example.com'): array
     {
         $docs = [];
 
-        foreach (InscricaoDocumento::TIPOS as $tipo) {
-            $docs[$tipo] = UploadedFile::fake()->create(strtolower($tipo).'.pdf', 100, 'application/pdf');
+        foreach ($edital->documentosRequeridos as $docRequerido) {
+            $docs[$docRequerido->id] = UploadedFile::fake()->create(strtolower($docRequerido->tipo).'.pdf', 100, 'application/pdf');
         }
 
         return [

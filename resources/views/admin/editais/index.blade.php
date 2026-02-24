@@ -1,8 +1,8 @@
 <x-app-layout>
     <x-slot name="header">
         <div>
-            <h2 class="text-xl font-bold text-slate-900">Gestão de Editais</h2>
-            <p class="text-sm text-slate-500">Configure períodos de inscrição e documentos obrigatórios.</p>
+            <h2 class="text-xl font-bold text-slate-900">Editais</h2>
+            <p class="text-sm text-slate-500">Gerencie todos os editais do processo seletivo.</p>
         </div>
     </x-slot>
 
@@ -15,59 +15,170 @@
             <div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first('edital') }}</div>
         @endif
 
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <a href="{{ route('admin.editais.create') }}" class="btn-primary">Novo edital</a>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <form method="GET" x-data="{ timer: null }" class="w-full space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" x-ref="filterForm">
+                <div class="md:flex md:items-end md:gap-3">
+                    <div class="grid flex-1 gap-3 md:grid-cols-4">
+                        <div>
+                            <x-input-label for="q" value="Pesquisar edital" />
+                            <x-text-input
+                                id="q"
+                                name="q"
+                                type="text"
+                                class="input-base"
+                                :value="$q"
+                                placeholder="Título ou descrição"
+                                @input="clearTimeout(timer); timer = setTimeout(() => $refs.filterForm.submit(), 350)"
+                            />
+                        </div>
+                        <div>
+                            <x-input-label for="mes" value="Mês" />
+                            <select id="mes" name="mes" class="input-base" @change="$refs.filterForm.submit()">
+                                <option value="">Todos</option>
+                                @foreach ($meses as $numero => $nome)
+                                    <option value="{{ $numero }}" @selected($mes === $numero)>{{ $nome }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div>
+                            <x-input-label for="ano" value="Ano" />
+                            <select id="ano" name="ano" class="input-base" @change="$refs.filterForm.submit()">
+                                <option value="">Todos</option>
+                                @foreach ($anosDisponiveis as $anoOpcao)
+                                    <option value="{{ $anoOpcao }}" @selected($ano === (int) $anoOpcao)>{{ $anoOpcao }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <x-input-label for="status" value="Status" />
+                            <select id="status" name="status" class="input-base" @change="$refs.filterForm.submit()">
+                                <option value="">Todos</option>
+                                @foreach ($statusOptions as $statusOpcao)
+                                    <option value="{{ $statusOpcao }}" @selected($status === $statusOpcao)>{{ $statusOpcao }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 flex items-end justify-end md:mt-0 md:pb-[2px]">
+                        <a href="{{ route('admin.editais.create') }}" class="btn-primary whitespace-nowrap">+ Novo Edital</a>
+                    </div>
+                </div>
+
+                @if ($q !== '' || $mes !== 0 || $ano !== 0 || $status !== '')
+                    <div>
+                        <a href="{{ route('admin.editais.index') }}" class="btn-muted">Limpar filtros</a>
+                    </div>
+                @endif
+            </form>
         </div>
 
-        <div class="table-wrap">
-            <table class="table-base">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Título</th>
-                        <th>Período</th>
-                        <th>Status</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($editais as $edital)
-                        @php
-                            $statusClass = match($edital->status) {
-                                'ABERTO' => 'status-homologada',
-                                'ENCERRADO' => 'status-indeferida',
-                                default => 'status-recebida',
-                            };
-                        @endphp
-                        <tr>
-                            <td>{{ $edital->id }}</td>
-                            <td>
-                                <p class="font-semibold text-slate-800">{{ $edital->titulo }}</p>
-                                <p class="text-xs text-slate-500">{{ \Illuminate\Support\Str::limit($edital->descricao, 70) }}</p>
-                            </td>
-                            <td>{{ $edital->periodo_inscricao_inicio->format('d/m/Y H:i') }} - {{ $edital->periodo_inscricao_fim->format('d/m/Y H:i') }}</td>
-                            <td><span class="status-badge {{ $statusClass }}">{{ $edital->status }}</span></td>
-                            <td>
-                                <div class="flex flex-wrap items-center gap-3">
-                                    <a href="{{ route('admin.editais.edit', $edital) }}" class="text-blue-600 hover:underline">Editar</a>
-                                    <a href="{{ route('admin.editais.inscricoes.index', $edital) }}" class="text-blue-600 hover:underline">Inscrições</a>
-                                    <form method="POST" action="{{ route('admin.editais.destroy', $edital) }}" onsubmit="return confirm('Excluir edital?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button class="text-red-600 hover:underline" type="submit">Excluir</button>
-                                    </form>
+        @if ($editais->isEmpty())
+            <div class="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600 shadow-sm">
+                Nenhum edital encontrado com os filtros atuais.
+            </div>
+        @else
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                @foreach ($editais as $edital)
+                    @php
+                        $badgeClass = match($edital->status) {
+                            'ABERTO' => 'status-homologada',
+                            'RASCUNHO' => 'status-indeferida',
+                            'ENCERRADO' => 'bg-slate-200 text-slate-700',
+                            default => 'status-recebida',
+                        };
+                    @endphp
+                    <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                        <div class="flex items-start justify-between gap-3">
+                            <h3 class="text-base font-bold text-slate-900">{{ $edital->titulo }}</h3>
+                            <span class="status-badge {{ $badgeClass }}">{{ $edital->status }}</span>
+                        </div>
+
+                        <p class="mt-2 text-sm text-slate-600">{{ \Illuminate\Support\Str::limit($edital->descricao ?: 'Sem descrição', 110) }}</p>
+
+                        <dl class="mt-4 space-y-1 text-xs text-slate-500">
+                            <div class="flex justify-between gap-3">
+                                <dt>Início</dt>
+                                <dd class="font-semibold text-slate-700">{{ $edital->periodo_inscricao_inicio->format('d/m/Y H:i') }}</dd>
+                            </div>
+                            <div class="flex justify-between gap-3">
+                                <dt>Fim</dt>
+                                <dd class="font-semibold text-slate-700">{{ $edital->periodo_inscricao_fim->format('d/m/Y H:i') }}</dd>
+                            </div>
+                        </dl>
+
+                        <div class="mt-3">
+                            <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Documentos exigidos</p>
+                            @if ($edital->documentosRequeridos->isEmpty())
+                                <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-600">Sem documentos exigidos</span>
+                            @else
+                                <div class="flex flex-wrap gap-1.5">
+                                    @foreach ($edital->documentosRequeridos as $doc)
+                                        <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-700">{{ $doc->tipo }}</span>
+                                    @endforeach
                                 </div>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" class="text-slate-500">Nenhum edital cadastrado.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+                            @endif
+                        </div>
 
-        <div>{{ $editais->links() }}</div>
+                        <form method="POST" action="{{ route('admin.editais.publicacao', $edital) }}" class="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                            @csrf
+                            <div class="flex items-center justify-between gap-3">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Publicado</p>
+                                <label class="relative inline-flex cursor-pointer items-center">
+                                    <input
+                                        type="checkbox"
+                                        name="publicado"
+                                        value="1"
+                                        class="peer sr-only"
+                                        @checked($edital->publicado)
+                                        onchange="this.form.submit()"
+                                    >
+                                    <div class="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-emerald-500"></div>
+                                    <span class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-5"></span>
+                                </label>
+                            </div>
+                        </form>
+
+                        <div class="mt-5 flex items-center gap-2 text-sm">
+                            <a
+                                href="{{ route('admin.editais.inscricoes.index', $edital) }}"
+                                class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 transition hover:bg-blue-100"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M2 5a2 2 0 012-2h6.586a1 1 0 01.707.293l1.414 1.414H16a2 2 0 012 2v1H2V5z" />
+                                    <path d="M2 9h16v6a2 2 0 01-2 2H4a2 2 0 01-2-2V9z" />
+                                </svg>
+                                Inscrições
+                            </a>
+                            <a
+                                href="{{ route('admin.editais.edit', $edital) }}"
+                                class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700 transition hover:bg-slate-100"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.46.263l-3.5.875a1 1 0 01-1.213-1.213l.875-3.5a1 1 0 01.263-.46l9.9-9.9a2 2 0 012.828 0z" />
+                                </svg>
+                                Editar
+                            </a>
+                            <form method="POST" action="{{ route('admin.editais.destroy', $edital) }}" onsubmit="return confirm('Excluir edital?');">
+                                @csrf
+                                @method('DELETE')
+                                <button
+                                    class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700 transition hover:bg-red-100"
+                                    type="submit"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.366-.446.911-.699 1.486-.699h.514c.575 0 1.12.253 1.486.699L12.5 4H16a1 1 0 110 2h-.617l-.666 9.327A2 2 0 0112.722 17H7.278a2 2 0 01-1.995-1.673L4.617 6H4a1 1 0 010-2h3.5l.757-.901zM8 8a1 1 0 012 0v5a1 1 0 11-2 0V8zm4-1a1 1 0 10-2 0v6a1 1 0 102 0V7z" clip-rule="evenodd" />
+                                    </svg>
+                                    Excluir
+                                </button>
+                            </form>
+                        </div>
+                    </article>
+                @endforeach
+            </div>
+
+            <div>{{ $editais->links() }}</div>
+        @endif
     </div>
 </x-app-layout>

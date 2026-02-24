@@ -42,7 +42,7 @@
                                 <a href="{{ route('public.inscricao.create', $editalAberto) }}" class="inline-flex items-center rounded-md border border-white bg-transparent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-white/10">
                                     Inscrever
                                 </a>
-                                <a href="{{ route('public.inscricao.create', $editalAberto) }}" class="inline-flex items-center rounded-md border border-white bg-transparent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-white/10">
+                                <a href="{{ $editalAberto->hasArquivoEdital() ? route('public.editais.download', $editalAberto) : route('public.inscricao.create', $editalAberto) }}" class="inline-flex items-center rounded-md border border-white bg-transparent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-white/10">
                                     Ver Edital
                                 </a>
                             </div>

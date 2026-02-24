@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     $editalAberto = Edital::query()
+        ->where('publicado', true)
         ->where('periodo_inscricao_inicio', '<=', now())
         ->where('periodo_inscricao_fim', '>=', now())
         ->orderByDesc('periodo_inscricao_inicio')
@@ -23,6 +24,7 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('/editais/{edital}/inscricao', [PublicInscricaoController::class, 'create'])->name('public.inscricao.create');
+Route::get('/editais/{edital}/arquivo', [AdminEditalController::class, 'downloadArquivo'])->name('public.editais.download');
 Route::post('/editais/{edital}/inscricao', [PublicInscricaoController::class, 'store'])
     ->middleware('throttle:10,60')
     ->name('public.inscricao.store');
@@ -42,6 +44,7 @@ Route::prefix('admin')
     ->name('admin.')
     ->group(function () {
         Route::resource('editais', AdminEditalController::class, ['parameters' => ['editais' => 'edital']])->except(['show']);
+        Route::post('editais/{edital}/publicacao', [AdminEditalController::class, 'updatePublicacao'])->name('editais.publicacao');
 
         Route::get('/editais/{edital}/inscricoes', [AdminInscricaoController::class, 'index'])->name('editais.inscricoes.index');
         Route::get('/inscricoes/{inscricao}', [AdminInscricaoController::class, 'show'])->name('inscricoes.show');
