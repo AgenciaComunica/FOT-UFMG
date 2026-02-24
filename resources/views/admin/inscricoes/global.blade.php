@@ -6,12 +6,26 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ showFilters: true }">
-        <form method="GET" x-show="showFilters" x-transition class="panel-card grid gap-3 md:grid-cols-5 md:items-end">
+    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="rangeInscricaoFilter(@js($dateStart), @js($dateEnd))">
+        <form method="GET" x-show="showFilters" x-transition class="panel-card grid gap-3 md:grid-cols-6 md:items-end" x-ref="filterForm">
             <input type="hidden" name="per_page" value="{{ $perPage }}">
+            <input type="hidden" name="data_inicio" x-model="startDate">
+            <input type="hidden" name="data_fim" x-model="endDate">
+            <div class="md:col-span-2">
+                <x-input-label for="q" value="Nome ou protocolo" />
+                <x-text-input
+                    id="q"
+                    name="q"
+                    type="text"
+                    class="input-base"
+                    :value="$search"
+                    placeholder="Nome, protocolo, email ou CPF"
+                    @input="clearTimeout(timer); timer = setTimeout(() => $refs.filterForm.submit(), 350)"
+                />
+            </div>
             <div>
                 <x-input-label for="edital_id" value="Edital" />
-                <select id="edital_id" name="edital_id" class="input-base">
+                <select id="edital_id" name="edital_id" class="input-base" @change="$refs.filterForm.submit()">
                     <option value="0">Todos</option>
                     @foreach ($editais as $edital)
                         <option value="{{ $edital->id }}" @selected($editalId === $edital->id)>{{ $edital->titulo }}</option>
@@ -20,7 +34,7 @@
             </div>
             <div>
                 <x-input-label for="status" value="Status" />
-                <select id="status" name="status" class="input-base">
+                <select id="status" name="status" class="input-base" @change="$refs.filterForm.submit()">
                     <option value="">Todos</option>
                     <option value="RECEBIDA" @selected($status === 'RECEBIDA')>RECEBIDA</option>
                     <option value="HOMOLOGADA" @selected($status === 'HOMOLOGADA')>HOMOLOGADA</option>
@@ -28,17 +42,14 @@
                 </select>
             </div>
             <div>
-                <x-input-label for="data" value="Data envio" />
-                <x-text-input id="data" name="data" type="date" class="input-base" :value="$date" />
+                <x-input-label value="Período envio" />
+                <input type="text" x-ref="range" class="input-base" readonly>
             </div>
-            <div>
-                <x-input-label for="q" value="Nome ou protocolo" />
-                <x-text-input id="q" name="q" type="text" class="input-base" :value="$search" placeholder="Nome, protocolo, email ou CPF" />
-            </div>
-            <div class="flex gap-2">
-                <x-primary-button>Filtrar</x-primary-button>
-                <a href="{{ route('admin.inscricoes.index') }}" class="btn-muted">Limpar</a>
-            </div>
+            @if ($filtroAlterado)
+                <div class="flex gap-2">
+                    <a href="{{ route('admin.inscricoes.index') }}" class="btn-muted">Limpar</a>
+                </div>
+            @endif
         </form>
 
         <div class="table-wrap">
@@ -85,7 +96,8 @@
             <form method="GET" class="flex items-center gap-2">
                 <input type="hidden" name="edital_id" value="{{ $editalId }}">
                 <input type="hidden" name="status" value="{{ $status }}">
-                <input type="hidden" name="data" value="{{ $date }}">
+                <input type="hidden" name="data_inicio" value="{{ $dateStart }}">
+                <input type="hidden" name="data_fim" value="{{ $dateEnd }}">
                 <input type="hidden" name="q" value="{{ $search }}">
                 <label for="per_page_bottom" class="text-sm text-slate-600">Itens por página</label>
                 <select id="per_page_bottom" name="per_page" class="rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
@@ -116,4 +128,51 @@
             </div>
         </div>
     </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+    <script>
+        function rangeInscricaoFilter(initialStart, initialEnd) {
+            return {
+                showFilters: true,
+                timer: null,
+                startDate: initialStart || '',
+                endDate: initialEnd || '',
+                init() {
+                    if (typeof flatpickr === 'undefined') {
+                        return;
+                    }
+
+                    const defaultDate = [];
+                    if (this.startDate) defaultDate.push(this.startDate);
+                    if (this.endDate) defaultDate.push(this.endDate);
+
+                    flatpickr(this.$refs.range, {
+                        mode: 'range',
+                        dateFormat: 'Y-m-d',
+                        defaultDate,
+                        locale: (flatpickr.l10ns && flatpickr.l10ns.pt) ? flatpickr.l10ns.pt : undefined,
+                        onReady: (_, __, instance) => {
+                            instance.input.value = this.formatLabel(this.startDate, this.endDate);
+                        },
+                        onClose: (selectedDates, dateStr, instance) => {
+                            if (selectedDates.length === 2) {
+                                this.startDate = instance.formatDate(selectedDates[0], 'Y-m-d');
+                                this.endDate = instance.formatDate(selectedDates[1], 'Y-m-d');
+                                instance.input.value = this.formatLabel(this.startDate, this.endDate);
+                                this.$nextTick(() => this.$refs.filterForm.submit());
+                            }
+                        },
+                    });
+                },
+                formatLabel(start, end) {
+                    if (!start || !end) return 'Selecione um período';
+                    const [sy, sm, sd] = start.split('-');
+                    const [ey, em, ed] = end.split('-');
+                    return `${sd}/${sm}/${sy} até ${ed}/${em}/${ey}`;
+                },
+            };
+        }
+    </script>
 </x-app-layout>

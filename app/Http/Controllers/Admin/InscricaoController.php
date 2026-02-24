@@ -9,6 +9,7 @@ use App\Models\Edital;
 use App\Models\Inscricao;
 use App\Models\InscricaoDocumento;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,19 +26,28 @@ class InscricaoController extends Controller
     {
         $status = $request->string('status')->value();
         $search = $request->string('q')->value();
-        $date = $request->string('data')->value();
+        $dateStart = $this->parseDate($request->string('data_inicio')->value(), false);
+        $dateEnd = $this->parseDate($request->string('data_fim')->value(), true);
+        if ($dateStart && $dateEnd && $dateStart->gt($dateEnd)) {
+            [$dateStart, $dateEnd] = [$dateEnd->copy()->startOfDay(), $dateStart->copy()->endOfDay()];
+        }
         $editalId = (int) $request->integer('edital_id', 0);
         $perPageRaw = trim((string) $request->string('per_page', '30')->value());
         $perPageOptions = ['30', '50', '100', 'all'];
         if (! in_array($perPageRaw, $perPageOptions, true)) {
             $perPageRaw = '30';
         }
+        $filtroAlterado = $editalId > 0
+            || filled($status)
+            || filled($search)
+            || (bool) $dateStart
+            || (bool) $dateEnd;
 
         $query = Inscricao::query()
             ->with('edital')
             ->when($editalId > 0, fn ($query) => $query->where('edital_id', $editalId))
             ->when($status, fn ($query) => $query->where('status', $status))
-            ->when($date, fn ($query) => $query->whereDate('submitted_at', $date))
+            ->when($dateStart && $dateEnd, fn ($query) => $query->whereBetween('submitted_at', [$dateStart, $dateEnd]))
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($nested) use ($search) {
                     $nested
@@ -61,12 +71,29 @@ class InscricaoController extends Controller
             'inscricoes' => $inscricoes,
             'status' => $status,
             'search' => $search,
-            'date' => $date,
+            'dateStart' => $dateStart?->format('Y-m-d'),
+            'dateEnd' => $dateEnd?->format('Y-m-d'),
             'editalId' => $editalId,
             'perPage' => $perPageRaw,
             'perPageOptions' => $perPageOptions,
+            'filtroAlterado' => $filtroAlterado,
             'editais' => Edital::query()->orderByDesc('periodo_inscricao_inicio')->get(['id', 'titulo']),
         ]);
+    }
+
+    private function parseDate(?string $value, bool $endOfDay): ?Carbon
+    {
+        if (! filled($value)) {
+            return null;
+        }
+
+        try {
+            $date = Carbon::parse($value);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $endOfDay ? $date->endOfDay() : $date->startOfDay();
     }
 
     public function byEdital(Edital $edital, Request $request): View
