@@ -38,6 +38,8 @@
                 <select id="status" name="status" class="input-base" @change="$refs.filterForm.submit()">
                     <option value="">Todos</option>
                     <option value="RECEBIDA" @selected($status === 'RECEBIDA')>Em Análise</option>
+                    <option value="PRE_APROVADA" @selected($status === 'PRE_APROVADA')>Pré-Aprovado</option>
+                    <option value="PRE_INDEFERIDA" @selected($status === 'PRE_INDEFERIDA')>Pré-Indeferido</option>
                     <option value="HOMOLOGADA" @selected($status === 'HOMOLOGADA')>Homologada</option>
                     <option value="INDEFERIDA" @selected($status === 'INDEFERIDA')>Indeferida</option>
                 </select>
@@ -58,10 +60,26 @@
             </div>
         </form>
 
+        <div class="flex justify-end">
+            <button
+                type="button"
+                class="inline-flex h-[42px] items-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+                x-show="selectedIds.length > 0"
+                @click="bulkModalOpen = true"
+            >
+                Aplicar em vários
+            </button>
+        </div>
+
         <div class="table-wrap">
             <table class="table-base">
                 <thead>
                     <tr>
+                        <th>
+                                <label class="inline-flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" class="rounded border-slate-300 text-blue-600" @change="toggleAll($event.target.checked)">
+                                </label>
+                            </th>
                         <th>Protocolo</th>
                         <th>Nome</th>
                         <th>Edital</th>
@@ -77,15 +95,26 @@
                             $statusClass = match($inscricao->status) {
                                 'HOMOLOGADA' => 'status-homologada',
                                 'INDEFERIDA' => 'status-indeferida',
+                                'PRE_APROVADA' => 'bg-cyan-100 text-cyan-700',
+                                'PRE_INDEFERIDA' => 'bg-orange-100 text-orange-700',
                                 default => 'status-recebida',
                             };
                             $statusLabel = match($inscricao->status) {
                                 'HOMOLOGADA' => 'Homologada',
                                 'INDEFERIDA' => 'Indeferida',
+                                'PRE_APROVADA' => 'Pré-Aprovado',
+                                'PRE_INDEFERIDA' => 'Pré-Indeferido',
                                 default => 'Em Análise',
                             };
                         @endphp
                         <tr>
+                            <td>
+                                <input type="checkbox"
+                                       class="rounded border-slate-300 text-blue-600"
+                                       value="{{ $inscricao->id }}"
+                                       @change="toggleOne({{ $inscricao->id }}, $event.target.checked)"
+                                       :checked="selectedIds.includes({{ $inscricao->id }})">
+                            </td>
                             <td class="font-semibold text-slate-700">{{ $inscricao->protocolo }}</td>
                             <td>{{ $inscricao->nome_completo }}</td>
                             <td>{{ $inscricao->edital?->titulo ?? '-' }}</td>
@@ -112,11 +141,41 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-slate-500">Nenhuma inscrição encontrada.</td>
+                            <td colspan="8" class="text-slate-500">Nenhuma inscrição encontrada.</td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
+        </div>
+
+        <div x-show="bulkModalOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="bulkModalOpen=false">
+            <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-lg">
+                    <h3 class="text-lg font-bold text-slate-900">Ação para vários</h3>
+                    <form method="POST" action="{{ route('admin.inscricoes.status.bulk') }}" class="mt-4 space-y-3">
+                        @csrf
+                    <input type="hidden" name="q" value="{{ $search }}">
+                    <input type="hidden" name="edital_id" value="{{ $editalId }}">
+                    <input type="hidden" name="status" :value="bulkStatus">
+                    <input type="hidden" name="data_inicio" value="{{ $dateStart }}">
+                    <input type="hidden" name="data_fim" value="{{ $dateEnd }}">
+                    <template x-for="id in selectedIds" :key="`sel-${id}`">
+                        <input type="hidden" name="selected_ids[]" :value="id">
+                    </template>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" class="btn-muted" @click="bulkStatus='RECEBIDA'">Em Análise</button>
+                        <button type="button" class="btn-success" @click="bulkStatus='HOMOLOGADA'">Homologar</button>
+                        <button type="button" class="btn-danger" @click="bulkStatus='INDEFERIDA'">Indeferir</button>
+                    </div>
+                    <div x-show="bulkStatus === 'INDEFERIDA'">
+                        <x-input-label for="bulk_indeferimento_motivo" value="Motivo do indeferimento (obrigatório)" />
+                        <textarea id="bulk_indeferimento_motivo" name="indeferimento_motivo" rows="3" class="input-base"></textarea>
+                    </div>
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button" class="btn-muted" @click="bulkModalOpen=false">Cancelar</button>
+                        <button type="submit" class="btn-primary">Aplicar</button>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
@@ -164,8 +223,26 @@
             return {
                 showFilters: true,
                 timer: null,
+                selectedIds: [],
+                bulkModalOpen: false,
+                bulkStatus: 'RECEBIDA',
                 startDate: initialStart || '',
                 endDate: initialEnd || '',
+                toggleOne(id, checked) {
+                    if (checked) {
+                        if (!this.selectedIds.includes(id)) this.selectedIds.push(id);
+                        return;
+                    }
+                    this.selectedIds = this.selectedIds.filter((item) => item !== id);
+                },
+                toggleAll(checked) {
+                    const ids = @js($inscricoes->pluck('id')->values());
+                    if (checked) {
+                        this.selectedIds = [...ids];
+                        return;
+                    }
+                    this.selectedIds = [];
+                },
                 init() {
                     if (typeof flatpickr === 'undefined') {
                         return;

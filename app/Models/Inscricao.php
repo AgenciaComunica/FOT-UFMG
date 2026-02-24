@@ -14,6 +14,8 @@ class Inscricao extends Model
     protected $table = 'inscricoes';
 
     public const STATUS_RECEBIDA = 'RECEBIDA';
+    public const STATUS_PRE_APROVADA = 'PRE_APROVADA';
+    public const STATUS_PRE_INDEFERIDA = 'PRE_INDEFERIDA';
     public const STATUS_HOMOLOGADA = 'HOMOLOGADA';
     public const STATUS_INDEFERIDA = 'INDEFERIDA';
 

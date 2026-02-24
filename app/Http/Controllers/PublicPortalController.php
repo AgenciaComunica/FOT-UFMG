@@ -162,6 +162,8 @@ class PublicPortalController extends Controller
     private function statusPublico(string $status): string
     {
         return match ($status) {
+            Inscricao::STATUS_PRE_APROVADA => 'Pré-Aprovado',
+            Inscricao::STATUS_PRE_INDEFERIDA => 'Pré-Indeferido',
             Inscricao::STATUS_HOMOLOGADA => 'Homologada',
             Inscricao::STATUS_INDEFERIDA => 'Indeferida',
             default => 'Em análise',

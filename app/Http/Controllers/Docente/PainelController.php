@@ -7,6 +7,7 @@ use App\Models\Edital;
 use App\Models\Inscricao;
 use App\Models\InscricaoAvaliacao;
 use App\Models\InscricaoDocumento;
+use App\Services\InscricaoPreClassificacaoService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,11 +17,30 @@ use Illuminate\View\View;
 
 class PainelController extends Controller
 {
+    public function __construct(private readonly InscricaoPreClassificacaoService $preClassificacaoService)
+    {
+    }
+
     public function index(Request $request): View
     {
         $user = $request->user();
-        $status = $request->string('status')->value() ?: 'PENDENTE';
+        $hasAprovadorAny = Edital::query()
+            ->whereHas('docentesBanca', fn ($q) => $q
+                ->where('users.id', $user->id)
+                ->where('edital_docentes.aprovador', true))
+            ->exists();
+        $tab = strtolower(trim((string) $request->string('tab', 'pendente')->value()));
+        if (! in_array($tab, ['pendente', 'avaliado', 'aprovacao'], true)) {
+            $tab = 'pendente';
+        }
+        if ($tab === 'aprovacao' && ! $hasAprovadorAny) {
+            $tab = 'pendente';
+        }
         $search = trim((string) $request->string('q')->value());
+        $finalStatus = trim((string) $request->string('final_status')->value());
+        if (! in_array($finalStatus, ['', Inscricao::STATUS_RECEBIDA, Inscricao::STATUS_PRE_APROVADA, Inscricao::STATUS_PRE_INDEFERIDA, Inscricao::STATUS_HOMOLOGADA, Inscricao::STATUS_INDEFERIDA], true)) {
+            $finalStatus = '';
+        }
         $editalId = (int) $request->integer('edital_id', 0);
         $dateStart = $this->parseDate($request->string('data_inicio')->value(), false);
         $dateEnd = $this->parseDate($request->string('data_fim')->value(), true);
@@ -32,17 +52,46 @@ class PainelController extends Controller
         if (! in_array($perPageRaw, $perPageOptions, true)) {
             $perPageRaw = '10';
         }
-        if (! in_array($status, ['PENDENTE', 'AVALIADO'], true)) {
-            $status = 'PENDENTE';
+        $query = Inscricao::query()->with(['edital']);
+
+        if ($tab === 'aprovacao') {
+            $query
+                ->with(['avaliacoes', 'edital.docentesBanca:id,name'])
+                ->whereHas('edital.docentesBanca', fn ($q) => $q
+                    ->where('users.id', $user->id)
+                    ->where('edital_docentes.aprovador', true))
+                ->when($finalStatus !== '', fn ($q) => $q->where('status', $finalStatus));
+        } else {
+            $query
+                ->with(['avaliacoes' => fn ($q) => $q->where('docente_id', $user->id)])
+                ->whereIn('status', [
+                    Inscricao::STATUS_RECEBIDA,
+                    Inscricao::STATUS_PRE_APROVADA,
+                    Inscricao::STATUS_PRE_INDEFERIDA,
+                ])
+                ->whereNotNull('email_verified_at')
+                ->whereHas('edital.docentesBanca', fn ($q) => $q->where('users.id', $user->id))
+                ->when($tab === 'avaliado', function ($q) use ($user) {
+                    $q->whereHas('avaliacoes', function ($sub) use ($user) {
+                        $sub->where('docente_id', $user->id)->whereNotNull('nota');
+                    });
+                })
+                ->when($tab === 'pendente', function ($q) use ($user) {
+                    $q->where(function ($sub) use ($user) {
+                        $sub->whereDoesntHave('avaliacoes', fn ($s) => $s->where('docente_id', $user->id))
+                            ->orWhereHas('avaliacoes', fn ($s) => $s->where('docente_id', $user->id)->whereNull('nota'));
+                    });
+                });
         }
 
-        $query = Inscricao::query()
-            ->with(['edital', 'avaliacoes' => fn ($q) => $q->where('docente_id', $user->id)])
-            ->where('status', Inscricao::STATUS_RECEBIDA)
-            ->whereNotNull('email_verified_at')
-            ->whereHas('edital.docentesBanca', fn ($q) => $q->where('users.id', $user->id))
+        $query
             ->when($editalId > 0, fn ($q) => $q->where('edital_id', $editalId))
-            ->when($dateStart && $dateEnd, function ($q) use ($user, $dateStart, $dateEnd) {
+            ->when($dateStart && $dateEnd, function ($q) use ($user, $dateStart, $dateEnd, $tab) {
+                if ($tab === 'aprovacao') {
+                    $q->whereBetween('submitted_at', [$dateStart, $dateEnd]);
+                    return;
+                }
+
                 $q->whereHas('avaliacoes', function ($sub) use ($user, $dateStart, $dateEnd) {
                     $sub->where('docente_id', $user->id)
                         ->whereRaw('COALESCE(avaliado_at, updated_at) between ? and ?', [
@@ -51,29 +100,21 @@ class PainelController extends Controller
                         ]);
                 });
             })
-            ->when($search !== '', function ($q) use ($search, $user) {
-                $q->where(function ($nested) use ($search, $user) {
+            ->when($search !== '', function ($q) use ($search, $user, $tab) {
+                $q->where(function ($nested) use ($search, $user, $tab) {
                     $nested
                         ->where('nome_completo', 'like', '%'.$search.'%')
                         ->orWhere('protocolo', 'like', '%'.$search.'%')
                         ->orWhere('email', 'like', '%'.$search.'%')
-                        ->orWhereHas('edital', fn ($editalQ) => $editalQ->where('titulo', 'like', '%'.$search.'%'))
-                        ->orWhereHas('avaliacoes', function ($avaliacaoQ) use ($search, $user) {
+                        ->orWhereHas('edital', fn ($editalQ) => $editalQ->where('titulo', 'like', '%'.$search.'%'));
+
+                    if ($tab !== 'aprovacao') {
+                        $nested->orWhereHas('avaliacoes', function ($avaliacaoQ) use ($search, $user) {
                             $avaliacaoQ
                                 ->where('docente_id', $user->id)
                                 ->whereRaw('CAST(nota AS CHAR) LIKE ?', ['%'.$search.'%']);
                         });
-                });
-            })
-            ->when($status === 'AVALIADO', function ($q) use ($user) {
-                $q->whereHas('avaliacoes', function ($sub) use ($user) {
-                    $sub->where('docente_id', $user->id)->whereNotNull('nota');
-                });
-            })
-            ->when($status === 'PENDENTE', function ($q) use ($user) {
-                $q->where(function ($sub) use ($user) {
-                    $sub->whereDoesntHave('avaliacoes', fn ($s) => $s->where('docente_id', $user->id))
-                        ->orWhereHas('avaliacoes', fn ($s) => $s->where('docente_id', $user->id)->whereNull('nota'));
+                    }
                 });
             })
             ->latest('submitted_at');
@@ -84,13 +125,20 @@ class PainelController extends Controller
 
         $inscricoes = $query->paginate($perPage)->withQueryString();
         $editais = Edital::query()
-            ->whereHas('docentesBanca', fn ($q) => $q->where('users.id', $user->id))
+            ->whereHas('docentesBanca', function ($q) use ($user, $tab) {
+                $q->where('users.id', $user->id);
+                if ($tab === 'aprovacao') {
+                    $q->where('edital_docentes.aprovador', true);
+                }
+            })
             ->orderByDesc('periodo_inscricao_inicio')
             ->get(['id', 'titulo']);
 
         return view('docente.inscricoes.index', [
             'inscricoes' => $inscricoes,
-            'status' => $status,
+            'tab' => $tab,
+            'hasAprovadorAny' => $hasAprovadorAny,
+            'finalStatus' => $finalStatus,
             'search' => $search,
             'editalId' => $editalId,
             'editais' => $editais,
@@ -119,22 +167,30 @@ class PainelController extends Controller
     public function show(Request $request, Inscricao $inscricao): View
     {
         $user = $request->user();
-        $this->assertPodeAvaliar($inscricao, $user->id);
         $isAprovador = $this->isAprovadorNoEdital($inscricao, $user->id);
-
-        $inscricao->load([
-            'edital.documentosRequeridos',
-            'documentos',
-            'avaliacoes' => fn ($q) => $q->where('docente_id', $user->id),
-        ]);
         if ($isAprovador) {
-            $inscricao->load([
-                'avaliacoes.docente',
-                'edital.docentesBanca:id,name',
-            ]);
+            $this->assertPodeAcessarInscricao($inscricao, $user->id);
+        } else {
+            $this->assertPodeAvaliar($inscricao, $user->id);
         }
 
-        $avaliacao = $inscricao->avaliacoes->first();
+        $relations = [
+            'edital.documentosRequeridos',
+            'documentos',
+        ];
+
+        if ($isAprovador) {
+            $relations[] = 'avaliacoes.docente';
+            $relations[] = 'edital.docentesBanca:id,name';
+        } else {
+            $relations['avaliacoes'] = fn ($q) => $q->where('docente_id', $user->id);
+        }
+
+        $inscricao->load($relations);
+
+        $avaliacao = $isAprovador
+            ? $inscricao->avaliacoes->firstWhere('docente_id', $user->id)
+            : $inscricao->avaliacoes->first();
         $statusAvaliacao = $avaliacao && $avaliacao->nota !== null ? 'AVALIADO' : 'PENDENTE';
 
         return view('docente.inscricoes.show', [
@@ -176,6 +232,8 @@ class PainelController extends Controller
             ]
         );
 
+        $this->preClassificacaoService->recalcular($inscricao->edital()->firstOrFail());
+
         return redirect()
             ->route('docente.inscricoes.show', $inscricao)
             ->with('status', 'Avaliação salva com sucesso.');
@@ -184,7 +242,11 @@ class PainelController extends Controller
     public function downloadDocumento(Request $request, Inscricao $inscricao, InscricaoDocumento $doc)
     {
         $user = $request->user();
-        $this->assertPodeAvaliar($inscricao, $user->id);
+        if ($this->isAprovadorNoEdital($inscricao, $user->id)) {
+            $this->assertPodeAcessarInscricao($inscricao, $user->id);
+        } else {
+            $this->assertPodeAvaliar($inscricao, $user->id);
+        }
 
         abort_unless($doc->inscricao_id === $inscricao->id, 404);
         abort_unless(Storage::disk('local')->exists($doc->arquivo_path), 404);
@@ -195,7 +257,7 @@ class PainelController extends Controller
     public function definirVereditoFinal(Request $request, Inscricao $inscricao): RedirectResponse
     {
         $user = $request->user();
-        $this->assertPodeAvaliar($inscricao, $user->id);
+        $this->assertPodeAcessarInscricao($inscricao, $user->id);
         $this->assertPodeDefinirVeredito($inscricao, $user->id);
 
         $data = $request->validate([
@@ -240,12 +302,87 @@ class PainelController extends Controller
             ->with('status', 'Veredito final atualizado com sucesso.');
     }
 
+    public function definirVereditoFinalLote(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'status' => ['required', 'in:RECEBIDA,HOMOLOGADA,INDEFERIDA'],
+            'indeferimento_motivo' => ['nullable', 'string', 'max:4000'],
+            'selected_ids' => ['nullable', 'array'],
+            'selected_ids.*' => ['integer', 'exists:inscricoes,id'],
+        ]);
+        if ($data['status'] === Inscricao::STATUS_INDEFERIDA && ! filled($data['indeferimento_motivo'] ?? null)) {
+            throw ValidationException::withMessages([
+                'indeferimento_motivo' => 'O motivo é obrigatório para definir como indeferida.',
+            ]);
+        }
+
+        $ids = collect($data['selected_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+        if ($ids->isEmpty()) {
+            throw ValidationException::withMessages([
+                'selected_ids' => 'Selecione ao menos uma inscrição para aplicar a ação em lote.',
+            ]);
+        }
+
+        $query = Inscricao::query();
+        $query->whereIn('id', $ids);
+
+        $updated = 0;
+        $query->chunkById(100, function ($chunk) use (&$updated, $data, $user): void {
+            foreach ($chunk as $inscricao) {
+                if (! $this->isAprovadorNoEdital($inscricao, $user->id)) {
+                    continue;
+                }
+
+                if ($data['status'] === Inscricao::STATUS_RECEBIDA) {
+                    $inscricao->forceFill([
+                        'status' => Inscricao::STATUS_RECEBIDA,
+                        'decided_at' => null,
+                        'decided_by' => null,
+                        'indeferimento_motivo' => null,
+                    ])->save();
+                } elseif ($data['status'] === Inscricao::STATUS_HOMOLOGADA) {
+                    $inscricao->forceFill([
+                        'status' => Inscricao::STATUS_HOMOLOGADA,
+                        'decided_at' => now(),
+                        'decided_by' => $user->id,
+                        'indeferimento_motivo' => null,
+                    ])->save();
+                } else {
+                    $inscricao->forceFill([
+                        'status' => Inscricao::STATUS_INDEFERIDA,
+                        'decided_at' => now(),
+                        'decided_by' => $user->id,
+                        'indeferimento_motivo' => trim((string) $data['indeferimento_motivo']),
+                    ])->save();
+                }
+                $updated++;
+            }
+        });
+
+        return back()->with('status', "Ação em lote aplicada em {$updated} inscrição(ões).");
+    }
+
     private function assertPodeAvaliar(Inscricao $inscricao, int $docenteId): void
     {
-        if ($inscricao->status !== Inscricao::STATUS_RECEBIDA || $inscricao->email_verified_at === null) {
+        if (! in_array($inscricao->status, [Inscricao::STATUS_RECEBIDA, Inscricao::STATUS_PRE_APROVADA, Inscricao::STATUS_PRE_INDEFERIDA], true) || $inscricao->email_verified_at === null) {
             abort(403);
         }
 
+        $this->assertPertenceBanca($inscricao, $docenteId);
+    }
+
+    private function assertPodeAcessarInscricao(Inscricao $inscricao, int $docenteId): void
+    {
+        if ($inscricao->email_verified_at === null) {
+            abort(403);
+        }
+
+        $this->assertPertenceBanca($inscricao, $docenteId);
+    }
+
+    private function assertPertenceBanca(Inscricao $inscricao, int $docenteId): void
+    {
         $ok = $inscricao->edital()
             ->whereHas('docentesBanca', fn ($q) => $q->where('users.id', $docenteId))
             ->exists();

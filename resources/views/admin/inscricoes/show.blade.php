@@ -75,11 +75,15 @@
                     $statusClass = match($inscricao->status) {
                         'HOMOLOGADA' => 'status-homologada',
                         'INDEFERIDA' => 'status-indeferida',
+                        'PRE_APROVADA' => 'bg-cyan-100 text-cyan-700',
+                        'PRE_INDEFERIDA' => 'bg-orange-100 text-orange-700',
                         default => 'status-recebida',
                     };
                     $statusLabel = match($inscricao->status) {
                         'HOMOLOGADA' => 'Homologada',
                         'INDEFERIDA' => 'Indeferida',
+                        'PRE_APROVADA' => 'Pré-Aprovado',
+                        'PRE_INDEFERIDA' => 'Pré-Indeferido',
                         default => 'Em Análise',
                     };
                 @endphp
@@ -243,18 +247,29 @@
         <div class="panel-card">
             <h3 class="text-sm font-semibold text-slate-800">Controle de Status</h3>
             <p class="mt-1 text-xs text-slate-500">Altere o status final desta inscrição a qualquer momento.</p>
+            @php
+                $isEmAnaliseAdmin = in_array($inscricao->status, ['RECEBIDA', 'PRE_APROVADA', 'PRE_INDEFERIDA'], true);
+                $isHomologadaAdmin = $inscricao->status === 'HOMOLOGADA';
+                $isIndeferidaAdmin = $inscricao->status === 'INDEFERIDA';
+            @endphp
             <div class="mt-3 flex flex-wrap gap-2">
-                <form method="POST" action="{{ route('admin.inscricoes.status', $inscricao) }}">
-                    @csrf
-                    <input type="hidden" name="status" value="RECEBIDA">
-                    <button type="submit" class="btn-muted {{ $inscricao->status === 'RECEBIDA' ? 'ring-2 ring-slate-400' : '' }}">Em Análise</button>
-                </form>
-                <form method="POST" action="{{ route('admin.inscricoes.status', $inscricao) }}">
-                    @csrf
-                    <input type="hidden" name="status" value="HOMOLOGADA">
-                    <button type="submit" class="btn-success {{ $inscricao->status === 'HOMOLOGADA' ? 'ring-2 ring-emerald-500' : '' }}">Homologada</button>
-                </form>
-                <button type="button" class="btn-danger {{ $inscricao->status === 'INDEFERIDA' ? 'ring-2 ring-red-500' : '' }}" @click="modalIndeferir = true">Indeferida</button>
+                @unless ($isEmAnaliseAdmin)
+                    <form method="POST" action="{{ route('admin.inscricoes.status', $inscricao) }}">
+                        @csrf
+                        <input type="hidden" name="status" value="RECEBIDA">
+                        <button type="submit" class="btn-muted">Em Análise</button>
+                    </form>
+                @endunless
+                @unless ($isHomologadaAdmin)
+                    <form method="POST" action="{{ route('admin.inscricoes.status', $inscricao) }}">
+                        @csrf
+                        <input type="hidden" name="status" value="HOMOLOGADA">
+                        <button type="submit" class="btn-success">Homologada</button>
+                    </form>
+                @endunless
+                @unless ($isIndeferidaAdmin)
+                    <button type="button" class="btn-danger" @click="modalIndeferir = true">Indeferida</button>
+                @endunless
             </div>
         </div>
 

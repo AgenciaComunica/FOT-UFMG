@@ -9,7 +9,7 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ tab: 'dados' }">
+    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ tab: 'dados', modalIndeferir: false }">
         @if (session('status'))
             <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{{ session('status') }}</div>
         @endif
@@ -61,78 +61,13 @@
             </form>
         </section>
 
-        @if ($isAprovadorNoEdital)
-            <section class="panel-card space-y-4">
-                <div>
-                    <h3 class="text-base font-semibold text-slate-900">Avaliações da banca</h3>
-                    <p class="text-xs text-slate-500">Visualização disponível somente para docente aprovador deste edital.</p>
-                </div>
-
-                <div class="table-wrap">
-                    <table class="table-base">
-                        <thead>
-                            <tr>
-                                <th>Docente</th>
-                                <th>Status</th>
-                                <th>Nota</th>
-                                <th>Avaliação Subjetiva</th>
-                                <th>Comentário</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($inscricao->edital->docentesBanca as $docenteBanca)
-                                @php
-                                    $avaliacaoDocente = $inscricao->avaliacoes->firstWhere('docente_id', $docenteBanca->id);
-                                    $statusDocente = $avaliacaoDocente && $avaliacaoDocente->nota !== null ? 'AVALIADO' : 'PENDENTE';
-                                @endphp
-                                <tr>
-                                    <td>{{ $docenteBanca->name }}</td>
-                                    <td>
-                                        <span class="status-badge {{ $statusDocente === 'AVALIADO' ? 'status-homologada' : 'bg-blue-100 text-blue-700' }}">
-                                            {{ $statusDocente }}
-                                        </span>
-                                    </td>
-                                    <td>{{ $avaliacaoDocente && $avaliacaoDocente->nota !== null ? number_format((float) $avaliacaoDocente->nota, 2, ',', '.') : '-' }}</td>
-                                    <td>{{ $avaliacaoDocente?->avaliacao_subjetiva ?: '-' }}</td>
-                                    <td>{{ $avaliacaoDocente?->comentario ?: '-' }}</td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="5" class="text-slate-500">Sem docentes na banca.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="rounded-xl border border-slate-200 p-4">
-                    <h4 class="text-sm font-semibold text-slate-800">Veredito final da inscrição</h4>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        <form method="POST" action="{{ route('docente.inscricoes.status', $inscricao) }}">
-                            @csrf
-                            <input type="hidden" name="status" value="RECEBIDA">
-                            <button type="submit" class="btn-muted {{ $inscricao->status === 'RECEBIDA' ? 'ring-2 ring-slate-400' : '' }}">Em Análise</button>
-                        </form>
-                        <form method="POST" action="{{ route('docente.inscricoes.status', $inscricao) }}">
-                            @csrf
-                            <input type="hidden" name="status" value="HOMOLOGADA">
-                            <button type="submit" class="btn-success {{ $inscricao->status === 'HOMOLOGADA' ? 'ring-2 ring-emerald-500' : '' }}">Homologada</button>
-                        </form>
-                        <form method="POST" action="{{ route('docente.inscricoes.status', $inscricao) }}" class="flex flex-wrap items-center gap-2">
-                            @csrf
-                            <input type="hidden" name="status" value="INDEFERIDA">
-                            <input type="text" name="indeferimento_motivo" class="input-base w-72" placeholder="Motivo do indeferimento" required>
-                            <button type="submit" class="btn-danger {{ $inscricao->status === 'INDEFERIDA' ? 'ring-2 ring-red-500' : '' }}">Indeferida</button>
-                        </form>
-                    </div>
-                </div>
-            </section>
-        @endif
-
         <section class="panel-card">
             <div class="mb-4 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
                 <button type="button" @click="tab = 'dados'" class="rounded-lg px-3 py-2 text-sm font-semibold" :class="tab === 'dados' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'">Dados</button>
                 <button type="button" @click="tab = 'documentos'" class="rounded-lg px-3 py-2 text-sm font-semibold" :class="tab === 'documentos' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'">Documentos</button>
+                @if ($isAprovadorNoEdital)
+                    <button type="button" @click="tab = 'avaliacoes'" class="rounded-lg px-3 py-2 text-sm font-semibold" :class="tab === 'avaliacoes' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'">Avaliações da banca</button>
+                @endif
             </div>
 
             <div x-show="tab === 'dados'" x-transition class="space-y-2 text-sm text-slate-700">
@@ -145,11 +80,15 @@
                         $statusClass = match($inscricao->status) {
                             'HOMOLOGADA' => 'status-homologada',
                             'INDEFERIDA' => 'status-indeferida',
+                            'PRE_APROVADA' => 'bg-cyan-100 text-cyan-700',
+                            'PRE_INDEFERIDA' => 'bg-orange-100 text-orange-700',
                             default => 'status-recebida',
                         };
                         $statusLabel = match($inscricao->status) {
                             'HOMOLOGADA' => 'Homologada',
                             'INDEFERIDA' => 'Indeferida',
+                            'PRE_APROVADA' => 'Pré-Aprovado',
+                            'PRE_INDEFERIDA' => 'Pré-Indeferido',
                             default => 'Em Análise',
                         };
                     @endphp
@@ -169,7 +108,98 @@
                     @endforelse
                 </ul>
             </div>
+
+            @if ($isAprovadorNoEdital)
+                <div x-show="tab === 'avaliacoes'" x-transition class="space-y-4">
+                    <div class="table-wrap">
+                        <table class="table-base">
+                            <thead>
+                                <tr>
+                                    <th>Docente</th>
+                                    <th>Status</th>
+                                    <th>Nota</th>
+                                    <th>Avaliação Subjetiva</th>
+                                    <th>Comentário</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($inscricao->edital->docentesBanca as $docenteBanca)
+                                    @php
+                                        $avaliacaoDocente = $inscricao->avaliacoes->firstWhere('docente_id', $docenteBanca->id);
+                                        $statusDocente = $avaliacaoDocente && $avaliacaoDocente->nota !== null ? 'AVALIADO' : 'PENDENTE';
+                                    @endphp
+                                    <tr>
+                                        <td>{{ $docenteBanca->name }}</td>
+                                        <td>
+                                            <span class="status-badge {{ $statusDocente === 'AVALIADO' ? 'status-homologada' : 'bg-blue-100 text-blue-700' }}">
+                                                {{ $statusDocente }}
+                                            </span>
+                                        </td>
+                                        <td>{{ $avaliacaoDocente && $avaliacaoDocente->nota !== null ? number_format((float) $avaliacaoDocente->nota, 2, ',', '.') : '-' }}</td>
+                                        <td>{{ $avaliacaoDocente?->avaliacao_subjetiva ?: '-' }}</td>
+                                        <td>{{ $avaliacaoDocente?->comentario ?: '-' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-slate-500">Sem docentes na banca.</td>
+                                    </tr>
+                            @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
         </section>
+
+        @if ($isAprovadorNoEdital)
+            <section class="panel-card">
+                <h4 class="text-sm font-semibold text-slate-800">Veredito final da inscrição</h4>
+                @php
+                    $isEmAnaliseDocente = in_array($inscricao->status, ['RECEBIDA', 'PRE_APROVADA', 'PRE_INDEFERIDA'], true);
+                    $isHomologadaDocente = $inscricao->status === 'HOMOLOGADA';
+                    $isIndeferidaDocente = $inscricao->status === 'INDEFERIDA';
+                @endphp
+                <div class="mt-3 flex flex-wrap gap-2">
+                    @unless ($isEmAnaliseDocente)
+                        <form method="POST" action="{{ route('docente.inscricoes.status', $inscricao) }}">
+                            @csrf
+                            <input type="hidden" name="status" value="RECEBIDA">
+                            <button type="submit" class="btn-muted">Em Análise</button>
+                        </form>
+                    @endunless
+                    @unless ($isHomologadaDocente)
+                        <form method="POST" action="{{ route('docente.inscricoes.status', $inscricao) }}">
+                            @csrf
+                            <input type="hidden" name="status" value="HOMOLOGADA">
+                            <button type="submit" class="btn-success">Homologada</button>
+                        </form>
+                    @endunless
+                    @unless ($isIndeferidaDocente)
+                        <button type="button" class="btn-danger" @click="modalIndeferir = true">Indeferida</button>
+                    @endunless
+                </div>
+            </section>
+        @endif
+
+        @if ($isAprovadorNoEdital)
+            <div x-show="modalIndeferir" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display: none;" @click.self="modalIndeferir = false">
+                <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-lg">
+                    <h3 class="text-lg font-bold text-slate-900">Definir como indeferida</h3>
+                    <form method="POST" action="{{ route('docente.inscricoes.status', $inscricao) }}" class="mt-3 space-y-3">
+                        @csrf
+                        <input type="hidden" name="status" value="INDEFERIDA">
+                        <div>
+                            <x-input-label for="indeferimento_motivo_docente" value="Motivo (obrigatório)" />
+                            <textarea id="indeferimento_motivo_docente" name="indeferimento_motivo" rows="4" class="input-base" required>{{ old('indeferimento_motivo', $inscricao->indeferimento_motivo) }}</textarea>
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button type="button" class="btn-muted" @click="modalIndeferir = false">Cancelar</button>
+                            <button type="submit" class="btn-danger">Confirmar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
 
         <a href="{{ route('docente.inscricoes.index') }}" class="text-sm font-semibold text-blue-600 hover:underline">Voltar para inscrições</a>
     </div>

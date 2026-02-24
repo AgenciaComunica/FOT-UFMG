@@ -58,6 +58,7 @@ Route::prefix('admin')
         Route::get('/inscricoes/{inscricao}', [AdminInscricaoController::class, 'show'])->name('inscricoes.show');
         Route::put('/inscricoes/{inscricao}', [AdminInscricaoController::class, 'update'])->name('inscricoes.update');
         Route::post('/inscricoes/{inscricao}/status', [AdminInscricaoController::class, 'updateStatus'])->name('inscricoes.status');
+        Route::post('/inscricoes/status/lote', [AdminInscricaoController::class, 'bulkUpdateStatus'])->name('inscricoes.status.bulk');
         Route::put('/inscricoes/{inscricao}/documentos/{doc}', [AdminInscricaoController::class, 'updateDocumento'])->name('inscricoes.documentos.update');
         Route::delete('/inscricoes/{inscricao}/documentos/{doc}', [AdminInscricaoController::class, 'destroyDocumento'])->name('inscricoes.documentos.destroy');
         Route::post('/inscricoes/{inscricao}/homologar', [AdminInscricaoController::class, 'homologar'])->name('inscricoes.homologar');
@@ -93,6 +94,7 @@ Route::prefix('docente')
         Route::get('/inscricoes/{inscricao}/avaliar', [DocentePainelController::class, 'show'])->name('inscricoes.show');
         Route::post('/inscricoes/{inscricao}/avaliar', [DocentePainelController::class, 'salvarAvaliacao'])->name('inscricoes.salvar');
         Route::post('/inscricoes/{inscricao}/status', [DocentePainelController::class, 'definirVereditoFinal'])->name('inscricoes.status');
+        Route::post('/inscricoes/status/lote', [DocentePainelController::class, 'definirVereditoFinalLote'])->name('inscricoes.status.bulk');
         Route::get('/inscricoes/{inscricao}/documentos/{doc}/download', [DocentePainelController::class, 'downloadDocumento'])->name('inscricoes.documentos.download');
     });
 

@@ -22,6 +22,8 @@
                 <select id="status" name="status" class="input-base">
                     <option value="">Todos</option>
                     <option value="RECEBIDA" @selected($status === 'RECEBIDA')>Em Análise</option>
+                    <option value="PRE_APROVADA" @selected($status === 'PRE_APROVADA')>Pré-Aprovado</option>
+                    <option value="PRE_INDEFERIDA" @selected($status === 'PRE_INDEFERIDA')>Pré-Indeferido</option>
                     <option value="HOMOLOGADA" @selected($status === 'HOMOLOGADA')>Homologada</option>
                     <option value="INDEFERIDA" @selected($status === 'INDEFERIDA')>Indeferida</option>
                 </select>
@@ -58,11 +60,15 @@
                             $statusClass = match($inscricao->status) {
                                 'HOMOLOGADA' => 'status-homologada',
                                 'INDEFERIDA' => 'status-indeferida',
+                                'PRE_APROVADA' => 'bg-cyan-100 text-cyan-700',
+                                'PRE_INDEFERIDA' => 'bg-orange-100 text-orange-700',
                                 default => 'status-recebida',
                             };
                             $statusLabel = match($inscricao->status) {
                                 'HOMOLOGADA' => 'Homologada',
                                 'INDEFERIDA' => 'Indeferida',
+                                'PRE_APROVADA' => 'Pré-Aprovado',
+                                'PRE_INDEFERIDA' => 'Pré-Indeferido',
                                 default => 'Em Análise',
                             };
                         @endphp

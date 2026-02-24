@@ -13,6 +13,7 @@ use App\Models\Inscricao;
 use App\Models\InscricaoAvaliacao;
 use App\Models\InscricaoDocumento;
 use App\Models\User;
+use App\Services\InscricaoPreClassificacaoService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,6 +29,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InscricaoController extends Controller
 {
+    public function __construct(private readonly InscricaoPreClassificacaoService $preClassificacaoService)
+    {
+    }
+
     public function index(Request $request): View
     {
         ['status' => $status, 'search' => $search, 'dateStart' => $dateStart, 'dateEnd' => $dateEnd, 'editalId' => $editalId] = $this->extractIndexFilters($request);
@@ -372,6 +377,8 @@ class InscricaoController extends Controller
             ]
         );
 
+        $this->preClassificacaoService->recalcular($inscricao->edital()->firstOrFail());
+
         return redirect()
             ->route('admin.inscricoes.show', $inscricao)
             ->with('status', 'Avaliação atualizada com sucesso.');
@@ -402,6 +409,8 @@ class InscricaoController extends Controller
             ->where('inscricao_id', $inscricao->id)
             ->where('docente_id', (int) $data['docente_id'])
             ->delete();
+
+        $this->preClassificacaoService->recalcular($inscricao->edital()->firstOrFail());
 
         return redirect()
             ->route('admin.inscricoes.show', $inscricao)
@@ -506,7 +515,7 @@ class InscricaoController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($inscricao->id);
 
-            if ($inscricao->status !== Inscricao::STATUS_RECEBIDA) {
+            if (! in_array($inscricao->status, [Inscricao::STATUS_RECEBIDA, Inscricao::STATUS_PRE_APROVADA, Inscricao::STATUS_PRE_INDEFERIDA], true)) {
                 throw ValidationException::withMessages([
                     'status' => 'Apenas inscrições recebidas podem ser homologadas.',
                 ]);
@@ -596,59 +605,12 @@ class InscricaoController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($inscricao->id);
 
-            $status = $data['status'];
-
-            if ($status === Inscricao::STATUS_HOMOLOGADA) {
-                $user = User::query()->where('email', $inscricao->email)->first();
-
-                if ($user && $user->role !== User::ROLE_ALUNO) {
-                    throw ValidationException::withMessages([
-                        'status' => 'Já existe usuário com este e-mail e role diferente de aluno.',
-                    ]);
-                }
-
-                if (! $user) {
-                    $user = User::create([
-                        'name' => $inscricao->nome_completo,
-                        'email' => $inscricao->email,
-                        'password' => Str::password(20),
-                        'role' => User::ROLE_ALUNO,
-                        'email_verified_at' => now(),
-                    ]);
-                }
-
-                $inscricao->forceFill([
-                    'status' => Inscricao::STATUS_HOMOLOGADA,
-                    'decided_at' => now(),
-                    'decided_by' => $request->user()->id,
-                    'indeferimento_motivo' => null,
-                    'user_id' => $user->id,
-                ])->save();
-
-                $this->enviarResultadoInscricao($inscricao);
-
-                return;
-            }
-
-            if ($status === Inscricao::STATUS_INDEFERIDA) {
-                $inscricao->forceFill([
-                    'status' => Inscricao::STATUS_INDEFERIDA,
-                    'decided_at' => now(),
-                    'decided_by' => $request->user()->id,
-                    'indeferimento_motivo' => trim((string) $data['indeferimento_motivo']),
-                ])->save();
-
-                $this->enviarResultadoInscricao($inscricao);
-
-                return;
-            }
-
-            $inscricao->forceFill([
-                'status' => Inscricao::STATUS_RECEBIDA,
-                'decided_at' => null,
-                'decided_by' => null,
-                'indeferimento_motivo' => null,
-            ])->save();
+            $this->aplicarStatusFinal(
+                $inscricao,
+                $data['status'],
+                $request->user()->id,
+                $data['indeferimento_motivo'] ?? null
+            );
         });
 
         return redirect()
@@ -656,9 +618,53 @@ class InscricaoController extends Controller
             ->with('status', 'Status da inscrição atualizado com sucesso.');
     }
 
+    public function bulkUpdateStatus(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', 'in:RECEBIDA,HOMOLOGADA,INDEFERIDA'],
+            'indeferimento_motivo' => ['nullable', 'string', 'max:4000'],
+            'selected_ids' => ['nullable', 'array'],
+            'selected_ids.*' => ['integer', 'exists:inscricoes,id'],
+        ]);
+
+        if ($data['status'] === Inscricao::STATUS_INDEFERIDA && ! filled($data['indeferimento_motivo'] ?? null)) {
+            throw ValidationException::withMessages([
+                'indeferimento_motivo' => 'O motivo é obrigatório para definir como indeferida.',
+            ]);
+        }
+
+        $ids = collect($data['selected_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+        if ($ids->isEmpty()) {
+            throw ValidationException::withMessages([
+                'selected_ids' => 'Selecione ao menos uma inscrição para aplicar a ação em lote.',
+            ]);
+        }
+
+        $query = Inscricao::query();
+        $query->whereIn('id', $ids);
+
+        $updated = 0;
+        $query->chunkById(100, function ($chunk) use (&$updated, $data, $request): void {
+            foreach ($chunk as $inscricao) {
+                DB::transaction(function () use ($inscricao, $data, $request, &$updated): void {
+                    $locked = Inscricao::query()->lockForUpdate()->findOrFail($inscricao->id);
+                    $this->aplicarStatusFinal(
+                        $locked,
+                        $data['status'],
+                        $request->user()->id,
+                        $data['indeferimento_motivo'] ?? null
+                    );
+                    $updated++;
+                });
+            }
+        });
+
+        return back()->with('status', "Ação em lote aplicada em {$updated} inscrição(ões).");
+    }
+
     public function indeferir(AdminIndeferirInscricaoRequest $request, Inscricao $inscricao): RedirectResponse
     {
-        if ($inscricao->status !== Inscricao::STATUS_RECEBIDA) {
+        if (! in_array($inscricao->status, [Inscricao::STATUS_RECEBIDA, Inscricao::STATUS_PRE_APROVADA, Inscricao::STATUS_PRE_INDEFERIDA], true)) {
             throw ValidationException::withMessages([
                 'status' => 'Apenas inscrições recebidas podem ser indeferidas.',
             ]);
@@ -769,10 +775,67 @@ class InscricaoController extends Controller
     private function statusPublico(string $status): string
     {
         return match ($status) {
+            Inscricao::STATUS_PRE_APROVADA => 'Pré-aprovado',
+            Inscricao::STATUS_PRE_INDEFERIDA => 'Pré-indeferido',
             Inscricao::STATUS_HOMOLOGADA => 'Aprovado/Homologado',
             Inscricao::STATUS_INDEFERIDA => 'Não aprovado/Indeferido',
             default => 'Em análise',
         };
+    }
+
+    private function aplicarStatusFinal(Inscricao $inscricao, string $status, int $userId, ?string $indeferimentoMotivo): void
+    {
+        if ($status === Inscricao::STATUS_HOMOLOGADA) {
+            $user = User::query()->where('email', $inscricao->email)->first();
+
+            if ($user && $user->role !== User::ROLE_ALUNO) {
+                throw ValidationException::withMessages([
+                    'status' => 'Já existe usuário com este e-mail e role diferente de aluno.',
+                ]);
+            }
+
+            if (! $user) {
+                $user = User::create([
+                    'name' => $inscricao->nome_completo,
+                    'email' => $inscricao->email,
+                    'password' => Str::password(20),
+                    'role' => User::ROLE_ALUNO,
+                    'email_verified_at' => now(),
+                ]);
+            }
+
+            $inscricao->forceFill([
+                'status' => Inscricao::STATUS_HOMOLOGADA,
+                'decided_at' => now(),
+                'decided_by' => $userId,
+                'indeferimento_motivo' => null,
+                'user_id' => $user->id,
+            ])->save();
+
+            $this->enviarResultadoInscricao($inscricao);
+
+            return;
+        }
+
+        if ($status === Inscricao::STATUS_INDEFERIDA) {
+            $inscricao->forceFill([
+                'status' => Inscricao::STATUS_INDEFERIDA,
+                'decided_at' => now(),
+                'decided_by' => $userId,
+                'indeferimento_motivo' => trim((string) $indeferimentoMotivo),
+            ])->save();
+
+            $this->enviarResultadoInscricao($inscricao);
+
+            return;
+        }
+
+        $inscricao->forceFill([
+            'status' => Inscricao::STATUS_RECEBIDA,
+            'decided_at' => null,
+            'decided_by' => null,
+            'indeferimento_motivo' => null,
+        ])->save();
     }
 
     private function enviarVerificacaoInscricao(Inscricao $inscricao): void
