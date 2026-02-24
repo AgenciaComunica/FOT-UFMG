@@ -11,12 +11,16 @@ class DashboardRedirectController extends Controller
     {
         $user = auth()->user();
 
-        if ($user->role === User::ROLE_SECRETARIA) {
-            return redirect()->route('secretaria.inscricoes.index');
+        if ($user->role === User::ROLE_ADMIN) {
+            return redirect()->route('admin.painel');
         }
 
         if ($user->role === User::ROLE_ALUNO) {
             return redirect()->route('aluno.painel');
+        }
+
+        if ($user->role === User::ROLE_DOCENTE) {
+            return redirect()->route('docente.inscricoes.index');
         }
 
         abort(403);

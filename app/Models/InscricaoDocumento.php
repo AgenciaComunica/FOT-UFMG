@@ -11,17 +11,17 @@ class InscricaoDocumento extends Model
     use HasFactory;
 
     public const DOCUMENTO_FOTO = 'DOCUMENTO_FOTO';
-    public const COMPROVANTE_TAXA = 'COMPROVANTE_TAXA';
     public const DIPLOMA = 'DIPLOMA';
-    public const HISTORICO_ESCOLAR = 'HISTORICO_ESCOLAR';
     public const CURRICULO = 'CURRICULO';
+    public const COMPROVANTES_CURRICULO = 'COMPROVANTES_CURRICULO';
+    public const HISTORICO_ESCOLAR = 'HISTORICO_ESCOLAR';
 
     public const TIPOS = [
         self::DOCUMENTO_FOTO,
-        self::COMPROVANTE_TAXA,
         self::DIPLOMA,
-        self::HISTORICO_ESCOLAR,
         self::CURRICULO,
+        self::COMPROVANTES_CURRICULO,
+        self::HISTORICO_ESCOLAR,
     ];
 
     protected $fillable = [

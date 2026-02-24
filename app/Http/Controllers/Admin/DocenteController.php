@@ -1,0 +1,523 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\AdminStoreDocenteRequest;
+use App\Http\Requests\AdminUpdateDocenteRequest;
+use App\Mail\DocenteCredenciaisIniciaisMail;
+use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use ZipArchive;
+
+class DocenteController extends Controller
+{
+    public function index(Request $request): View
+    {
+        $q = trim((string) $request->string('q')->value());
+        $perPageRaw = trim((string) $request->string('per_page', '10')->value());
+        $perPageOptions = ['10', '20', '50', '100', 'all'];
+        if (! in_array($perPageRaw, $perPageOptions, true)) {
+            $perPageRaw = '10';
+        }
+
+        $query = User::query()
+            ->where('role', User::ROLE_DOCENTE)
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($nested) use ($q) {
+                    $nested
+                        ->where('name', 'like', '%'.$q.'%')
+                        ->orWhere('email', 'like', '%'.$q.'%')
+                        ->orWhere('telefone', 'like', '%'.$q.'%');
+                });
+            })
+            ->orderBy('name');
+
+        $perPage = $perPageRaw === 'all'
+            ? max(1, (clone $query)->count())
+            : (int) $perPageRaw;
+
+        $docentes = $query
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return view('admin.docentes.index', [
+            'docentes' => $docentes,
+            'q' => $q,
+            'perPage' => $perPageRaw,
+            'perPageOptions' => $perPageOptions,
+        ]);
+    }
+
+    public function create(): View
+    {
+        $returnTo = $this->resolveReturnTo(request('return_to'));
+
+        return view('admin.docentes.form', [
+            'docente' => new User(),
+            'formAction' => route('admin.docentes.store'),
+            'method' => 'POST',
+            'isEdit' => false,
+            'returnTo' => $returnTo,
+        ]);
+    }
+
+    public function store(AdminStoreDocenteRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+        $returnTo = $this->resolveReturnTo($request->input('return_to'));
+        $senhaTemporaria = Str::password(12);
+
+        $docente = User::query()->create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'telefone' => $data['telefone'] ?? null,
+            'password' => $senhaTemporaria,
+            'role' => User::ROLE_DOCENTE,
+            'ativo' => $request->boolean('ativo'),
+            'email_verified_at' => now(),
+        ]);
+
+        try {
+            Mail::to($docente->email)->send(new DocenteCredenciaisIniciaisMail(
+                $docente->name,
+                $docente->email,
+                $senhaTemporaria,
+                route('login'),
+                route('password.request'),
+            ));
+        } catch (\Throwable) {
+        }
+
+        $resetSent = Password::sendResetLink(['email' => $data['email']]) === Password::RESET_LINK_SENT;
+
+        $message = $resetSent
+            ? 'Docente cadastrado com sucesso. Credenciais iniciais e link de redefinição enviados por e-mail.'
+            : 'Docente cadastrado com sucesso. Credenciais iniciais enviadas; não foi possível enviar o link de redefinição.';
+
+        return $returnTo
+            ? redirect()->to($returnTo)->with('status', $message)
+            : redirect()->route('admin.docentes.index')->with('status', $message);
+    }
+
+    public function edit(User $docente): View
+    {
+        abort_unless($docente->role === User::ROLE_DOCENTE, 404);
+        $returnTo = $this->resolveReturnTo(request('return_to'));
+
+        return view('admin.docentes.form', [
+            'docente' => $docente,
+            'formAction' => route('admin.docentes.update', $docente),
+            'method' => 'PUT',
+            'isEdit' => true,
+            'returnTo' => $returnTo,
+        ]);
+    }
+
+    public function update(AdminUpdateDocenteRequest $request, User $docente): RedirectResponse
+    {
+        abort_unless($docente->role === User::ROLE_DOCENTE, 404);
+
+        $data = $request->validated();
+        $returnTo = $this->resolveReturnTo($request->input('return_to'));
+
+        $payload = [
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'telefone' => $data['telefone'] ?? null,
+            'ativo' => $request->boolean('ativo'),
+        ];
+
+        $docente->update($payload);
+
+        return $returnTo
+            ? redirect()->to($returnTo)->with('status', 'Docente atualizado com sucesso.')
+            : redirect()->route('admin.docentes.index')->with('status', 'Docente atualizado com sucesso.');
+    }
+
+    private function resolveReturnTo(?string $returnTo): ?string
+    {
+        $returnTo = trim((string) $returnTo);
+        if ($returnTo === '') {
+            return null;
+        }
+
+        if (str_starts_with($returnTo, '/admin/')) {
+            return $returnTo;
+        }
+
+        $parts = parse_url($returnTo);
+        if (! is_array($parts)) {
+            return null;
+        }
+
+        $path = (string) ($parts['path'] ?? '');
+        if (! str_starts_with($path, '/admin/')) {
+            return null;
+        }
+
+        $host = (string) ($parts['host'] ?? '');
+        $appHost = (string) parse_url((string) config('app.url'), PHP_URL_HOST);
+        $requestHost = request()->getHost();
+
+        $isLocalPair = in_array($host, ['127.0.0.1', 'localhost'], true)
+            && in_array($requestHost, ['127.0.0.1', 'localhost'], true);
+
+        if ($host !== '' && ! $isLocalPair && $host !== $appHost && $host !== $requestHost) {
+            return null;
+        }
+
+        $query = (string) ($parts['query'] ?? '');
+        $fragment = (string) ($parts['fragment'] ?? '');
+
+        return $path
+            .($query !== '' ? '?'.$query : '')
+            .($fragment !== '' ? '#'.$fragment : '');
+    }
+
+    public function updateStatus(Request $request, User $docente): RedirectResponse
+    {
+        abort_unless($docente->role === User::ROLE_DOCENTE, 404);
+
+        $docente->update([
+            'ativo' => $request->boolean('ativo'),
+        ]);
+
+        return redirect()
+            ->route('admin.docentes.index')
+            ->with('status', 'Status do docente atualizado com sucesso.');
+    }
+
+    public function destroy(User $docente): RedirectResponse
+    {
+        abort_unless($docente->role === User::ROLE_DOCENTE, 404);
+
+        $docente->delete();
+
+        return redirect()
+            ->route('admin.docentes.index')
+            ->with('status', 'Docente removido com sucesso.');
+    }
+
+    public function import(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'arquivo' => ['required', 'file', 'mimes:csv,txt,xlsx,xls'],
+        ], [
+            'arquivo.required' => 'Selecione um arquivo CSV ou Excel para importar.',
+            'arquivo.mimes' => 'Formato inválido. Use CSV ou XLSX.',
+        ]);
+
+        /** @var UploadedFile $arquivo */
+        $arquivo = $validated['arquivo'];
+        $extension = strtolower((string) $arquivo->getClientOriginalExtension());
+
+        if ($extension === 'xls') {
+            throw ValidationException::withMessages([
+                'arquivo' => 'Arquivo .xls não suportado no momento. Salve como .xlsx ou .csv.',
+            ]);
+        }
+
+        $rows = $extension === 'xlsx'
+            ? $this->parseXlsxRows($arquivo)
+            : $this->parseCsvRows($arquivo);
+
+        if (count($rows) === 0) {
+            throw ValidationException::withMessages([
+                'arquivo' => 'Nenhuma linha encontrada para importação.',
+            ]);
+        }
+
+        $headers = $this->detectHeaders($rows[0]);
+        $startIndex = $headers['has_header'] ? 1 : 0;
+        $importados = 0;
+        $falhas = [];
+        $emailsNoArquivo = [];
+
+        for ($i = $startIndex; $i < count($rows); $i++) {
+            $lineNumber = $i + 1;
+            $row = $rows[$i];
+
+            $nome = trim((string) $this->resolveColumn($row, $headers['nome_index'], 0));
+            $email = trim((string) $this->resolveColumn($row, $headers['email_index'], 1));
+            $telefone = trim((string) $this->resolveColumn($row, $headers['telefone_index'], 2));
+
+            $faltantes = [];
+            if ($nome === '') {
+                $faltantes[] = 'nome';
+            }
+            if ($email === '') {
+                $faltantes[] = 'email';
+            }
+
+            if ($faltantes !== []) {
+                $falhas[] = [
+                    'linha' => $lineNumber,
+                    'motivo' => 'faltou '.implode(' e ', $faltantes),
+                ];
+                continue;
+            }
+
+            if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $falhas[] = [
+                    'linha' => $lineNumber,
+                    'motivo' => 'email inválido',
+                ];
+                continue;
+            }
+
+            $emailKey = mb_strtolower($email);
+            if (in_array($emailKey, $emailsNoArquivo, true)) {
+                $falhas[] = [
+                    'linha' => $lineNumber,
+                    'motivo' => 'email duplicado no arquivo',
+                ];
+                continue;
+            }
+            $emailsNoArquivo[] = $emailKey;
+
+            if (User::query()->where('email', $email)->exists()) {
+                $falhas[] = [
+                    'linha' => $lineNumber,
+                    'motivo' => 'email já cadastrado no sistema',
+                ];
+                continue;
+            }
+
+            $senhaTemporaria = Str::password(12);
+            $docente = User::query()->create([
+                'name' => $nome,
+                'email' => $email,
+                'telefone' => $telefone !== '' ? $telefone : null,
+                'password' => $senhaTemporaria,
+                'role' => User::ROLE_DOCENTE,
+                'ativo' => true,
+                'email_verified_at' => now(),
+            ]);
+
+            try {
+                Mail::to($docente->email)->send(new DocenteCredenciaisIniciaisMail(
+                    $docente->name,
+                    $docente->email,
+                    $senhaTemporaria,
+                    route('login'),
+                    route('password.request'),
+                ));
+            } catch (\Throwable) {
+            }
+
+            Password::sendResetLink(['email' => $email]);
+            $importados++;
+        }
+
+        return redirect()
+            ->route('admin.docentes.index')
+            ->with('import_result', [
+                'importados' => $importados,
+                'falhas_total' => count($falhas),
+                'falhas' => $falhas,
+            ]);
+    }
+
+    public function downloadTemplate(): StreamedResponse
+    {
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM for Excel
+            fputcsv($handle, ['nome', 'email', 'telefone'], ';');
+            fclose($handle);
+        }, 'modelo-importacao-docentes.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
+     * @return array<int, array<int, string>>
+     */
+    private function parseCsvRows(UploadedFile $arquivo): array
+    {
+        $path = $arquivo->getRealPath();
+        if (! $path) {
+            return [];
+        }
+
+        $rows = [];
+        $handle = fopen($path, 'rb');
+        if (! $handle) {
+            return [];
+        }
+
+        while (($data = fgetcsv($handle, 0, ';')) !== false) {
+            if (count($data) <= 1) {
+                $data = str_getcsv((string) ($data[0] ?? ''), ',');
+            }
+
+            $row = array_map(static fn ($value) => trim((string) $value), $data);
+            if (implode('', $row) === '') {
+                continue;
+            }
+            $rows[] = $row;
+        }
+
+        fclose($handle);
+
+        return $rows;
+    }
+
+    /**
+     * @return array<int, array<int, string>>
+     */
+    private function parseXlsxRows(UploadedFile $arquivo): array
+    {
+        $path = $arquivo->getRealPath();
+        if (! $path) {
+            return [];
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($path) !== true) {
+            return [];
+        }
+
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        if (! $sheetXml) {
+            $zip->close();
+            return [];
+        }
+
+        $sharedStrings = [];
+        $sharedXml = $zip->getFromName('xl/sharedStrings.xml');
+        if ($sharedXml) {
+            $shared = simplexml_load_string($sharedXml);
+            if ($shared !== false) {
+                foreach ($shared->si as $si) {
+                    $text = '';
+                    if (isset($si->t)) {
+                        $text = (string) $si->t;
+                    } elseif (isset($si->r)) {
+                        foreach ($si->r as $run) {
+                            $text .= (string) $run->t;
+                        }
+                    }
+                    $sharedStrings[] = trim($text);
+                }
+            }
+        }
+
+        $sheet = simplexml_load_string($sheetXml);
+        $zip->close();
+        if ($sheet === false || ! isset($sheet->sheetData)) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($sheet->sheetData->row as $rowNode) {
+            $row = [];
+            foreach ($rowNode->c as $cell) {
+                $ref = (string) ($cell['r'] ?? '');
+                $colIndex = $this->columnLettersToIndex(preg_replace('/\d+/', '', $ref));
+                $type = (string) ($cell['t'] ?? '');
+
+                $value = '';
+                if ($type === 's') {
+                    $sharedIndex = (int) ($cell->v ?? 0);
+                    $value = (string) ($sharedStrings[$sharedIndex] ?? '');
+                } else {
+                    $value = trim((string) ($cell->v ?? ''));
+                }
+
+                $row[$colIndex] = trim($value);
+            }
+
+            if ($row === []) {
+                continue;
+            }
+
+            ksort($row);
+            $max = max(array_keys($row));
+            $normalized = [];
+            for ($i = 0; $i <= $max; $i++) {
+                $normalized[] = (string) ($row[$i] ?? '');
+            }
+
+            if (implode('', $normalized) === '') {
+                continue;
+            }
+            $rows[] = $normalized;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  array<int, string>  $firstRow
+     * @return array{has_header: bool, nome_index: ?int, email_index: ?int, telefone_index: ?int}
+     */
+    private function detectHeaders(array $firstRow): array
+    {
+        $normalized = array_map(
+            static fn ($v) => mb_strtolower(trim((string) $v)),
+            $firstRow
+        );
+
+        $nomeIndex = null;
+        $emailIndex = null;
+        $telefoneIndex = null;
+
+        foreach ($normalized as $index => $col) {
+            if (in_array($col, ['nome', 'nome completo', 'nome_completo'], true)) {
+                $nomeIndex = $index;
+            }
+            if (in_array($col, ['email', 'e-mail', 'mail'], true)) {
+                $emailIndex = $index;
+            }
+            if (in_array($col, ['telefone', 'celular', 'fone'], true)) {
+                $telefoneIndex = $index;
+            }
+        }
+
+        $hasHeader = $nomeIndex !== null || $emailIndex !== null || $telefoneIndex !== null;
+
+        return [
+            'has_header' => $hasHeader,
+            'nome_index' => $nomeIndex,
+            'email_index' => $emailIndex,
+            'telefone_index' => $telefoneIndex,
+        ];
+    }
+
+    /**
+     * @param  array<int, string>  $row
+     */
+    private function resolveColumn(array $row, ?int $headerIndex, int $fallbackIndex): string
+    {
+        if ($headerIndex !== null) {
+            return (string) ($row[$headerIndex] ?? '');
+        }
+
+        return (string) ($row[$fallbackIndex] ?? '');
+    }
+
+    private function columnLettersToIndex(string $letters): int
+    {
+        $letters = strtoupper(trim($letters));
+        if ($letters === '') {
+            return 0;
+        }
+
+        $index = 0;
+        for ($i = 0; $i < strlen($letters); $i++) {
+            $index = ($index * 26) + (ord($letters[$i]) - 64);
+        }
+
+        return max(0, $index - 1);
+    }
+}

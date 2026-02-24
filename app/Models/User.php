@@ -12,24 +12,24 @@ class User extends Authenticatable
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 
-    public const ROLE_SECRETARIA = 'secretaria';
+    public const ROLE_ADMIN = 'admin';
+    public const ROLE_SECRETARIA = self::ROLE_ADMIN;
     public const ROLE_ALUNO = 'aluno';
+    public const ROLE_DOCENTE = 'docente';
 
     /**
-     * The attributes that are mass assignable.
-     *
      * @var list<string>
      */
     protected $fillable = [
         'name',
         'email',
+        'telefone',
         'password',
         'role',
+        'ativo',
     ];
 
     /**
-     * The attributes that should be hidden for serialization.
-     *
      * @var list<string>
      */
     protected $hidden = [
@@ -37,21 +37,22 @@ class User extends Authenticatable
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'ativo' => 'boolean',
         ];
     }
 
     public function inscricoes(): HasMany
     {
         return $this->hasMany(Inscricao::class);
+    }
+
+    public function decisoesInscricoes(): HasMany
+    {
+        return $this->hasMany(Inscricao::class, 'decided_by');
     }
 }

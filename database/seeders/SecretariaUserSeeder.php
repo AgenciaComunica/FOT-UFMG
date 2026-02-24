@@ -8,17 +8,14 @@ use Illuminate\Support\Facades\Hash;
 
 class SecretariaUserSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         User::query()->updateOrCreate(
-            ['email' => 'secretaria@teste.com'],
+            ['email' => 'admin@teste.com'],
             [
-                'name' => 'Secretaria Teste',
+                'name' => 'Admin Teste',
                 'password' => Hash::make('12345678'),
-                'role' => User::ROLE_SECRETARIA,
+                'role' => User::ROLE_ADMIN,
                 'email_verified_at' => now(),
             ]
         );

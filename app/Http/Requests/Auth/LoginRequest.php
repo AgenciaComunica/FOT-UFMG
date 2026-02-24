@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -45,7 +46,15 @@ class LoginRequest extends FormRequest
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => 'E-mail ou senha incorretos.',
+            ]);
+        }
+
+        $user = Auth::user();
+        if ($user && $user->role === User::ROLE_DOCENTE && ! $user->ativo) {
+            Auth::logout();
+            throw ValidationException::withMessages([
+                'email' => 'Docente inativo. Solicite ativação para a secretaria.',
             ]);
         }
 
@@ -68,10 +77,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
+            'email' => 'Muitas tentativas de login. Tente novamente em '.ceil($seconds / 60).' minuto(s).',
         ]);
     }
 
