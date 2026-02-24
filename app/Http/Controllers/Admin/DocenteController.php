@@ -21,8 +21,13 @@ class DocenteController extends Controller
     public function index(Request $request): View
     {
         $q = trim((string) $request->string('q')->value());
+        $perPageRaw = trim((string) $request->string('per_page', '10')->value());
+        $perPageOptions = ['10', '20', '50', '100', 'all'];
+        if (! in_array($perPageRaw, $perPageOptions, true)) {
+            $perPageRaw = '10';
+        }
 
-        $docentes = User::query()
+        $query = User::query()
             ->where('role', User::ROLE_DOCENTE)
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($nested) use ($q) {
@@ -32,13 +37,21 @@ class DocenteController extends Controller
                         ->orWhere('telefone', 'like', '%'.$q.'%');
                 });
             })
-            ->orderBy('name')
-            ->paginate(20)
+            ->orderBy('name');
+
+        $perPage = $perPageRaw === 'all'
+            ? max(1, (clone $query)->count())
+            : (int) $perPageRaw;
+
+        $docentes = $query
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('admin.docentes.index', [
             'docentes' => $docentes,
             'q' => $q,
+            'perPage' => $perPageRaw,
+            'perPageOptions' => $perPageOptions,
         ]);
     }
 

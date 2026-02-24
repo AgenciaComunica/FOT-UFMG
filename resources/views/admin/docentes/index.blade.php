@@ -19,6 +19,7 @@
         @endif
 
         <form method="GET" class="panel-card grid gap-3 md:grid-cols-[1fr_auto] md:items-end" x-ref="filterForm">
+            <input type="hidden" name="per_page" value="{{ $perPage }}">
             <div>
                 <x-input-label for="q" value="Pesquisar docente" />
                 <x-text-input
@@ -111,7 +112,37 @@
             </table>
         </div>
 
-        <div>{{ $docentes->links() }}</div>
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <form method="GET" class="flex items-center gap-2">
+                <input type="hidden" name="q" value="{{ $q }}">
+                <label for="per_page_bottom" class="text-sm text-slate-600">Itens por página</label>
+                <select id="per_page_bottom" name="per_page" class="rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
+                    @foreach ($perPageOptions as $option)
+                        <option value="{{ $option }}" @selected((string) $perPage === (string) $option)>
+                            {{ $option === 'all' ? 'Todos' : $option }}
+                        </option>
+                    @endforeach
+                </select>
+            </form>
+
+            <div class="flex items-center gap-2">
+                @if ($docentes->previousPageUrl())
+                    <a href="{{ $docentes->previousPageUrl() }}" class="btn-muted">Anterior</a>
+                @else
+                    <span class="btn-muted cursor-not-allowed opacity-50">Anterior</span>
+                @endif
+
+                <span class="text-sm text-slate-600">
+                    Página {{ $docentes->currentPage() }} de {{ max(1, $docentes->lastPage()) }}
+                </span>
+
+                @if ($docentes->nextPageUrl())
+                    <a href="{{ $docentes->nextPageUrl() }}" class="btn-muted">Próximo</a>
+                @else
+                    <span class="btn-muted cursor-not-allowed opacity-50">Próximo</span>
+                @endif
+            </div>
+        </div>
 
         <div
             x-show="openImportModal"
