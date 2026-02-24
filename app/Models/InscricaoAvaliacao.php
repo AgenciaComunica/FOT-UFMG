@@ -10,12 +10,17 @@ class InscricaoAvaliacao extends Model
 {
     use HasFactory;
 
+    public const SUBJETIVA_HOMOLOGAR = 'HOMOLOGAR';
+    public const SUBJETIVA_INDEFERIR = 'INDEFERIR';
+    public const SUBJETIVA_ABSTER = 'ABSTER';
+
     protected $table = 'inscricao_avaliacoes';
 
     protected $fillable = [
         'inscricao_id',
         'docente_id',
         'nota',
+        'avaliacao_subjetiva',
         'comentario',
         'avaliado_at',
     ];

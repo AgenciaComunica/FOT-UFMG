@@ -20,7 +20,7 @@ class DashboardRedirectController extends Controller
         }
 
         if ($user->role === User::ROLE_DOCENTE) {
-            return redirect()->route('docente.painel');
+            return redirect()->route('docente.inscricoes.index');
         }
 
         abort(403);

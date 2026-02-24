@@ -86,6 +86,10 @@ Route::prefix('docente')
     ->name('docente.')
     ->group(function () {
         Route::get('/painel', [DocentePainelController::class, 'index'])->name('painel');
+        Route::get('/inscricoes', [DocentePainelController::class, 'index'])->name('inscricoes.index');
+        Route::get('/inscricoes/{inscricao}/avaliar', [DocentePainelController::class, 'show'])->name('inscricoes.show');
+        Route::post('/inscricoes/{inscricao}/avaliar', [DocentePainelController::class, 'salvarAvaliacao'])->name('inscricoes.salvar');
+        Route::get('/inscricoes/{inscricao}/documentos/{doc}/download', [DocentePainelController::class, 'downloadDocumento'])->name('inscricoes.documentos.download');
     });
 
 require __DIR__.'/auth.php';

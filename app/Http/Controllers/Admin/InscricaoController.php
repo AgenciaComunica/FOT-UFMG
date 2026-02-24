@@ -202,8 +202,10 @@ class InscricaoController extends Controller
                     'docente' => $docente,
                     'status' => $avaliacao && $avaliacao->nota !== null ? 'AVALIADO' : 'PENDENTE',
                     'nota' => $avaliacao?->nota,
+                    'avaliacao_subjetiva' => $avaliacao?->avaliacao_subjetiva,
                     'comentario' => $avaliacao?->comentario,
                     'avaliado_at' => $avaliacao?->avaliado_at,
+                    'ultima_avaliacao_at' => $avaliacao && $avaliacao->nota !== null ? $avaliacao->updated_at : null,
                 ];
             })
             ->values();
@@ -228,6 +230,7 @@ class InscricaoController extends Controller
         $data = $request->validate([
             'docente_id' => ['required', 'integer', 'exists:users,id'],
             'nota' => ['required', 'numeric', 'min:0', 'max:10'],
+            'avaliacao_subjetiva' => ['required', 'in:HOMOLOGAR,INDEFERIR,ABSTER'],
             'comentario' => ['nullable', 'string', 'max:2000'],
             'confirm_code_expected' => ['required', 'digits:2'],
             'confirm_code_input' => ['required', 'digits:2'],
@@ -236,6 +239,8 @@ class InscricaoController extends Controller
             'nota.numeric' => 'A nota deve ser numérica.',
             'nota.min' => 'A nota mínima é 0.',
             'nota.max' => 'A nota máxima é 10.',
+            'avaliacao_subjetiva.required' => 'Selecione a avaliação subjetiva.',
+            'avaliacao_subjetiva.in' => 'Avaliação subjetiva inválida.',
             'confirm_code_input.required' => 'Informe o código de confirmação.',
             'confirm_code_input.digits' => 'O código de confirmação deve ter 2 dígitos.',
         ]);
@@ -250,6 +255,7 @@ class InscricaoController extends Controller
             ],
             [
                 'nota' => (float) $data['nota'],
+                'avaliacao_subjetiva' => $data['avaliacao_subjetiva'],
                 'comentario' => filled($data['comentario'] ?? null) ? trim((string) $data['comentario']) : null,
                 'avaliado_at' => now(),
             ]

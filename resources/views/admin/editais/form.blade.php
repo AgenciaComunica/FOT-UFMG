@@ -1,8 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
-        <div>
-            <h2 class="text-xl font-bold text-slate-900">{{ $edital->exists ? 'Editar edital' : 'Novo edital' }}</h2>
-            <p class="text-sm text-slate-500">Configure período, publicação e documentos exigidos.</p>
+        <div class="flex w-full items-center justify-between gap-3">
+            <div>
+                <h2 class="text-xl font-bold text-slate-900">{{ $edital->exists ? 'Editar edital' : 'Novo edital' }}</h2>
+                <p class="text-sm text-slate-500">Configure período, publicação e documentos exigidos.</p>
+            </div>
+            <a href="{{ route('admin.painel') }}" class="btn-muted">Voltar para Painel</a>
         </div>
     </x-slot>
 

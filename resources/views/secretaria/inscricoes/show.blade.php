@@ -1,6 +1,9 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Inscricao #{{ $inscricao->id }}</h2>
+        <div class="flex w-full items-center justify-between gap-3">
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Inscricao #{{ $inscricao->id }}</h2>
+            <a href="{{ route('secretaria.inscricoes.index') }}" class="btn-muted">Voltar para Inscrições</a>
+        </div>
     </x-slot>
 
     <div class="py-8">

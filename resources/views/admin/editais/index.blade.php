@@ -79,6 +79,7 @@
                                 name="q"
                                 type="text"
                                 class="input-base"
+                                data-preserve-focus="1"
                                 :value="$q"
                                 placeholder="Título ou descrição"
                                 @input="clearTimeout(timer); timer = setTimeout(() => $refs.filterForm.submit(), 350)"

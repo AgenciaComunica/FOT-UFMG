@@ -1,8 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
-        <div>
-            <h2 class="text-xl font-bold text-slate-900">{{ $isEdit ? 'Editar docente' : 'Novo docente' }}</h2>
-            <p class="text-sm text-slate-500">Cadastro de acesso para docentes avaliadores.</p>
+        <div class="flex w-full items-center justify-between gap-3">
+            <div>
+                <h2 class="text-xl font-bold text-slate-900">{{ $isEdit ? 'Editar docente' : 'Novo docente' }}</h2>
+                <p class="text-sm text-slate-500">Cadastro de acesso para docentes avaliadores.</p>
+            </div>
+            <a href="{{ route('admin.docentes.index') }}" class="btn-muted">Voltar para Docentes</a>
         </div>
     </x-slot>
 

@@ -73,6 +73,11 @@ class DocentesAvaliacoesSeeder extends Seeder
             'Documentação e histórico bem apresentados.',
             'Perfil acadêmico consistente para a vaga.',
         ];
+        $subjetivas = [
+            InscricaoAvaliacao::SUBJETIVA_HOMOLOGAR,
+            InscricaoAvaliacao::SUBJETIVA_INDEFERIR,
+            InscricaoAvaliacao::SUBJETIVA_ABSTER,
+        ];
 
         foreach ($inscricoes as $item) {
             $inscricao = $item['inscricao'];
@@ -85,6 +90,7 @@ class DocentesAvaliacoesSeeder extends Seeder
                     'inscricao_id' => $inscricao->id,
                     'docente_id' => $docente->id,
                     'nota' => $avaliado ? number_format(random_int(0, 1000) / 100, 2, '.', '') : null,
+                    'avaliacao_subjetiva' => $avaliado ? $subjetivas[array_rand($subjetivas)] : null,
                     'comentario' => $avaliado ? $comentarios[array_rand($comentarios)] : null,
                     'avaliado_at' => $avaliado ? now()->subDays(random_int(0, 10)) : null,
                 ]);

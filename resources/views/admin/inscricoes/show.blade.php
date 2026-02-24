@@ -1,8 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
-        <div>
-            <h2 class="text-xl font-bold text-slate-900">Inscrição {{ $inscricao->protocolo }}</h2>
-            <p class="text-sm text-slate-500">{{ $inscricao->edital?->titulo }}</p>
+        <div class="flex w-full items-center justify-between gap-3">
+            <div>
+                <h2 class="text-xl font-bold text-slate-900">Inscrição {{ $inscricao->protocolo }}</h2>
+                <p class="text-sm text-slate-500">{{ $inscricao->edital?->titulo }}</p>
+            </div>
+            <a href="{{ route('admin.inscricoes.index', ['edital_id' => $inscricao->edital_id]) }}" class="btn-muted">Voltar para Inscrições</a>
         </div>
     </x-slot>
 
@@ -13,6 +16,7 @@
                 'docente_nome' => $item['docente']->name,
                 'status' => $item['status'],
                 'nota' => $item['nota'] !== null ? (string) $item['nota'] : '',
+                'avaliacao_subjetiva' => $item['avaliacao_subjetiva'] ?? '',
                 'comentario' => $item['comentario'] ?? '',
             ];
         })->values();
@@ -122,6 +126,8 @@
                                 <th>Docente</th>
                                 <th>Status</th>
                                 <th>Nota</th>
+                                <th>Data última avaliação</th>
+                                <th>Avaliação Subjetiva</th>
                                 <th>Comentário</th>
                                 <th class="text-right">Ações</th>
                             </tr>
@@ -137,6 +143,18 @@
                                     <td class="font-semibold text-slate-700">{{ $item['docente']->name }}</td>
                                     <td><span class="status-badge {{ $statusClassAvaliacao }}">{{ $item['status'] }}</span></td>
                                     <td>{{ $item['nota'] !== null ? number_format((float) $item['nota'], 2, ',', '.') : '-' }}</td>
+                                    <td>{{ $item['ultima_avaliacao_at'] ? \Illuminate\Support\Carbon::parse($item['ultima_avaliacao_at'])->format('d/m/Y H:i') : '-' }}</td>
+                                    <td>
+                                        @if ($item['avaliacao_subjetiva'] === 'HOMOLOGAR')
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">✓ Homologar</span>
+                                        @elseif ($item['avaliacao_subjetiva'] === 'INDEFERIR')
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-red-700">✕ Indeferir</span>
+                                        @elseif ($item['avaliacao_subjetiva'] === 'ABSTER')
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">- Abster</span>
+                                        @else
+                                            -
+                                        @endif
+                                    </td>
                                     <td>{{ $item['comentario'] ?: '-' }}</td>
                                     <td>
                                         <div class="flex justify-end gap-2">
@@ -148,6 +166,7 @@
                                                     docente_nome: @js($item['docente']->name),
                                                     status: @js($item['status']),
                                                     nota: @js($item['nota'] !== null ? (string) $item['nota'] : ''),
+                                                    avaliacao_subjetiva: @js($item['avaliacao_subjetiva'] ?? ''),
                                                     comentario: @js($item['comentario'] ?? '')
                                                 })"
                                             >
@@ -173,7 +192,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-slate-500">Nenhum docente configurado na banca deste edital.</td>
+                                    <td colspan="7" class="text-slate-500">Nenhum docente configurado na banca deste edital.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -231,6 +250,7 @@
             @csrf
             <input type="hidden" name="docente_id" :value="avaliacaoForm.docente_id">
             <input type="hidden" name="nota" :value="avaliacaoForm.nota">
+            <input type="hidden" name="avaliacao_subjetiva" :value="avaliacaoForm.avaliacao_subjetiva">
             <input type="hidden" name="comentario" :value="avaliacaoForm.comentario">
             <input type="hidden" name="confirm_code_expected" :value="confirmModal.codeExpected">
             <input type="hidden" name="confirm_code_input" :value="confirmModal.codeInput">
@@ -249,9 +269,19 @@
                 <p class="mt-1 text-sm text-slate-600">Docente: <strong x-text="avaliacaoForm.docente_nome"></strong></p>
 
                 <div class="mt-4 space-y-3">
-                    <div>
-                        <x-input-label value="Nota (0 a 10)" />
-                        <input type="number" min="0" max="10" step="0.01" class="input-base mt-1" x-model="avaliacaoForm.nota">
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <div>
+                            <x-input-label value="Nota (0 a 10)" />
+                            <input type="number" min="0" max="10" step="0.01" class="input-base mt-1" x-model="avaliacaoForm.nota">
+                        </div>
+                        <div>
+                            <x-input-label value="Avaliação Subjetiva" />
+                            <select class="input-base mt-1" x-model="avaliacaoForm.avaliacao_subjetiva">
+                                <option value="HOMOLOGAR">✓ Homologar</option>
+                                <option value="INDEFERIR">✕ Indeferir</option>
+                                <option value="ABSTER">- Abster</option>
+                            </select>
+                        </div>
                     </div>
                     <div>
                         <x-input-label value="Comentário" />
@@ -298,6 +328,7 @@
                     docente_id: '',
                     docente_nome: '',
                     nota: '',
+                    avaliacao_subjetiva: 'ABSTER',
                     comentario: '',
                 },
                 confirmModal: {
@@ -312,6 +343,7 @@
                     this.avaliacaoForm.docente_id = String(item.docente_id ?? '');
                     this.avaliacaoForm.docente_nome = item.docente_nome ?? '';
                     this.avaliacaoForm.nota = item.nota ?? '';
+                    this.avaliacaoForm.avaliacao_subjetiva = item.avaliacao_subjetiva ?? 'ABSTER';
                     this.avaliacaoForm.comentario = item.comentario ?? '';
                     this.editModal.open = true;
                 },
