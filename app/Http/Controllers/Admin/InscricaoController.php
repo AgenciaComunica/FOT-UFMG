@@ -263,6 +263,15 @@ class InscricaoController extends Controller
             ->with('status', 'Dados da inscrição atualizados com sucesso.');
     }
 
+    public function destroy(Request $request, Inscricao $inscricao): RedirectResponse
+    {
+        $this->authorize('view', $inscricao);
+
+        $this->deleteInscricaoWithFiles($inscricao);
+
+        return back()->with('status', 'Inscrição excluída com sucesso.');
+    }
+
     public function updateDocumento(Request $request, Inscricao $inscricao, InscricaoDocumento $doc): RedirectResponse
     {
         $this->authorize('view', $inscricao);
@@ -662,6 +671,33 @@ class InscricaoController extends Controller
         return back()->with('status', "Ação em lote aplicada em {$updated} inscrição(ões).");
     }
 
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'selected_ids' => ['nullable', 'array'],
+            'selected_ids.*' => ['integer', 'exists:inscricoes,id'],
+        ]);
+
+        $ids = collect($data['selected_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+        if ($ids->isEmpty()) {
+            throw ValidationException::withMessages([
+                'selected_ids' => 'Selecione ao menos uma inscrição para excluir em lote.',
+            ]);
+        }
+
+        $deleted = 0;
+        Inscricao::query()
+            ->whereIn('id', $ids)
+            ->chunkById(100, function ($chunk) use (&$deleted): void {
+                foreach ($chunk as $inscricao) {
+                    $this->deleteInscricaoWithFiles($inscricao);
+                    $deleted++;
+                }
+            });
+
+        return back()->with('status', "Inscrição(ões) excluída(s): {$deleted}.");
+    }
+
     public function indeferir(AdminIndeferirInscricaoRequest $request, Inscricao $inscricao): RedirectResponse
     {
         if (! in_array($inscricao->status, [Inscricao::STATUS_RECEBIDA, Inscricao::STATUS_PRE_APROVADA, Inscricao::STATUS_PRE_INDEFERIDA], true)) {
@@ -856,5 +892,23 @@ class InscricaoController extends Controller
             );
         } catch (\Throwable) {
         }
+    }
+
+    private function deleteInscricaoWithFiles(Inscricao $inscricao): void
+    {
+        $inscricao->loadMissing('documentos');
+
+        foreach ($inscricao->documentos as $doc) {
+            if (filled($doc->arquivo_path) && Storage::disk('local')->exists($doc->arquivo_path)) {
+                Storage::disk('local')->delete($doc->arquivo_path);
+            }
+        }
+
+        $directory = 'inscricoes/'.$inscricao->id;
+        if (Storage::disk('local')->exists($directory)) {
+            Storage::disk('local')->deleteDirectory($directory);
+        }
+
+        $inscricao->delete();
     }
 }

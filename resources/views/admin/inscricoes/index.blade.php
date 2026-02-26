@@ -6,7 +6,7 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ showFilters: false }">
+    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ showFilters: false, confirmDeleteOpen: false, deleteFormId: '', deleteLabel: '' }">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <button type="button" class="btn-muted" @click="showFilters = !showFilters">Filtros</button>
             <div class="flex flex-wrap gap-2">
@@ -94,6 +94,19 @@
                                         </svg>
                                         Ver detalhes
                                     </a>
+                                    <form method="POST" id="delete-inscricao-{{ $inscricao->id }}" action="{{ route('admin.inscricoes.destroy', $inscricao) }}" class="hidden">
+                                        @csrf
+                                        @method('DELETE')
+                                    </form>
+                                    <button type="button"
+                                        @click="deleteFormId='delete-inscricao-{{ $inscricao->id }}'; deleteLabel='{{ $inscricao->protocolo }}'; confirmDeleteOpen=true"
+                                        class="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M6 8a1 1 0 011 1v6a1 1 0 102 0V9a1 1 0 112 0v6a1 1 0 102 0V9a1 1 0 112 0v6a3 3 0 11-6 0 3 3 0 11-6 0V9a1 1 0 011-1z" clip-rule="evenodd" />
+                                            <path d="M4 5a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z" />
+                                        </svg>
+                                        Excluir
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -137,6 +150,21 @@
                 @else
                     <span class="btn-muted cursor-not-allowed opacity-50">Próximo</span>
                 @endif
+            </div>
+        </div>
+
+        <div x-show="confirmDeleteOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="confirmDeleteOpen=false">
+            <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+                <h3 class="text-lg font-bold text-slate-900">Confirmar exclusão</h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    Deseja realmente excluir a inscrição
+                    <span class="font-semibold text-slate-800" x-text="deleteLabel"></span>?
+                </p>
+                <p class="mt-1 text-xs text-red-600">Esta ação é irreversível.</p>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button type="button" class="btn-muted" @click="confirmDeleteOpen=false">Cancelar</button>
+                    <button type="button" class="btn-danger" @click="if (deleteFormId) { const form = document.getElementById(deleteFormId); if (form) form.submit(); }">Excluir</button>
+                </div>
             </div>
         </div>
     </div>
