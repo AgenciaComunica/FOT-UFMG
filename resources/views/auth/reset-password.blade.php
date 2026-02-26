@@ -15,7 +15,7 @@
                 </div>
             </div>
 
-            <form method="POST" action="{{ route('password.store') }}" class="space-y-4">
+            <form method="POST" action="{{ route('password.store') }}" class="space-y-4" x-data="{ submitting: false }" @submit="submitting = true">
                 @csrf
 
                 <input type="hidden" name="token" value="{{ $request->route('token') }}">
@@ -34,8 +34,9 @@
                 </div>
 
                 <div class="flex items-center justify-end">
-                    <x-primary-button class="rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold tracking-wide text-white hover:bg-slate-800 focus:bg-slate-800 active:bg-slate-900">
-                        Redefinir senha
+                    <x-primary-button :disabled="submitting" class="rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold tracking-wide text-white hover:bg-slate-800 focus:bg-slate-800 active:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-70">
+                        <span x-show="!submitting">Redefinir senha</span>
+                        <span x-show="submitting" style="display:none;">Salvando...</span>
                     </x-primary-button>
                 </div>
             </form>

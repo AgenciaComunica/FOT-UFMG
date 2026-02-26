@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\ResetPasswordPtBrNotification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -54,5 +55,10 @@ class User extends Authenticatable
     public function decisoesInscricoes(): HasMany
     {
         return $this->hasMany(Inscricao::class, 'decided_by');
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordPtBrNotification($token));
     }
 }
