@@ -65,7 +65,7 @@
                 type="button"
                 class="inline-flex h-[42px] items-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
                 x-show="selectedIds.length > 0"
-                @click="bulkModalOpen = true"
+                @click="bulkModalOpen = true; bulkAction = 'status'; bulkStatus = 'RECEBIDA'"
             >
                 Aplicar em vários
             </button>
@@ -136,6 +136,19 @@
                                         </svg>
                                         Ver detalhes
                                     </a>
+                                    <form method="POST" id="delete-inscricao-{{ $inscricao->id }}" action="{{ route('admin.inscricoes.destroy', $inscricao) }}" class="hidden">
+                                        @csrf
+                                        @method('DELETE')
+                                    </form>
+                                    <button type="button"
+                                        @click="singleDeleteFormId = 'delete-inscricao-{{ $inscricao->id }}'; singleDeleteLabel = '{{ $inscricao->protocolo }}'; confirmSingleDeleteOpen = true"
+                                        class="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M6 8a1 1 0 011 1v6a1 1 0 102 0V9a1 1 0 112 0v6a1 1 0 102 0V9a1 1 0 112 0v6a3 3 0 11-6 0 3 3 0 11-6 0V9a1 1 0 011-1z" clip-rule="evenodd" />
+                                            <path d="M4 5a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z" />
+                                        </svg>
+                                        Excluir
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -149,9 +162,9 @@
         </div>
 
         <div x-show="bulkModalOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="bulkModalOpen=false">
-            <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-lg">
+            <div class="w-full max-w-3xl rounded-xl bg-white p-4 shadow-lg">
                     <h3 class="text-lg font-bold text-slate-900">Ação para vários</h3>
-                    <form method="POST" action="{{ route('admin.inscricoes.status.bulk') }}" class="mt-4 space-y-3">
+                    <form x-show="bulkAction === 'status'" method="POST" action="{{ route('admin.inscricoes.status.bulk') }}" class="mt-4 space-y-3">
                         @csrf
                     <input type="hidden" name="q" value="{{ $search }}">
                     <input type="hidden" name="edital_id" value="{{ $editalId }}">
@@ -161,10 +174,21 @@
                     <template x-for="id in selectedIds" :key="`sel-${id}`">
                         <input type="hidden" name="selected_ids[]" :value="id">
                     </template>
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" class="btn-muted" @click="bulkStatus='RECEBIDA'">Em Análise</button>
-                        <button type="button" class="btn-success" @click="bulkStatus='HOMOLOGADA'">Homologar</button>
-                        <button type="button" class="btn-danger" @click="bulkStatus='INDEFERIDA'">Indeferir</button>
+                    <div class="grid gap-3 md:grid-cols-3">
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 md:col-span-2">
+                            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Controle de Inscrição</p>
+                            <div class="flex items-center justify-center gap-2 py-1">
+                                <button type="button" class="btn-muted whitespace-nowrap" @click="bulkStatus='RECEBIDA'">Em Análise</button>
+                                <button type="button" class="btn-success whitespace-nowrap" @click="bulkStatus='HOMOLOGADA'">Homologar</button>
+                                <button type="button" class="btn-danger whitespace-nowrap" @click="bulkStatus='INDEFERIDA'">Indeferir</button>
+                            </div>
+                        </div>
+                        <div class="rounded-lg border border-red-200 bg-red-50 p-4 md:col-span-1">
+                            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-red-700">Exclusão de Inscrição</p>
+                            <div class="flex items-center justify-center gap-2 py-1">
+                                <button type="button" class="btn-danger whitespace-nowrap" @click="bulkAction='delete'">Excluir</button>
+                            </div>
+                        </div>
                     </div>
                     <div x-show="bulkStatus === 'INDEFERIDA'">
                         <x-input-label for="bulk_indeferimento_motivo" value="Motivo do indeferimento (obrigatório)" />
@@ -175,6 +199,42 @@
                         <button type="submit" class="btn-primary">Aplicar</button>
                     </div>
                 </form>
+
+                <form x-show="bulkAction === 'delete'" method="POST" action="{{ route('admin.inscricoes.destroy.bulk') }}" class="mt-4 space-y-3">
+                    @csrf
+                    <input type="hidden" name="q" value="{{ $search }}">
+                    <input type="hidden" name="edital_id" value="{{ $editalId }}">
+                    <input type="hidden" name="status" value="{{ $status }}">
+                    <input type="hidden" name="data_inicio" value="{{ $dateStart }}">
+                    <input type="hidden" name="data_fim" value="{{ $dateEnd }}">
+                    <template x-for="id in selectedIds" :key="`del-${id}`">
+                        <input type="hidden" name="selected_ids[]" :value="id">
+                    </template>
+
+                    <div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                        Você está prestes a excluir as inscrições selecionadas. Esta ação é irreversível.
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button" class="btn-muted" @click="bulkAction='status'">Voltar</button>
+                        <button type="submit" class="btn-danger">Excluir selecionadas</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div x-show="confirmSingleDeleteOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="confirmSingleDeleteOpen=false">
+            <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+                <h3 class="text-lg font-bold text-slate-900">Confirmar exclusão</h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    Deseja realmente excluir a inscrição
+                    <span class="font-semibold text-slate-800" x-text="singleDeleteLabel"></span>?
+                </p>
+                <p class="mt-1 text-xs text-red-600">Esta ação é irreversível.</p>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button type="button" class="btn-muted" @click="confirmSingleDeleteOpen=false">Cancelar</button>
+                    <button type="button" class="btn-danger" @click="submitSingleDelete()">Excluir</button>
+                </div>
             </div>
         </div>
 
@@ -225,7 +285,11 @@
                 timer: null,
                 selectedIds: [],
                 bulkModalOpen: false,
+                bulkAction: 'status',
                 bulkStatus: 'RECEBIDA',
+                confirmSingleDeleteOpen: false,
+                singleDeleteFormId: '',
+                singleDeleteLabel: '',
                 startDate: initialStart || '',
                 endDate: initialEnd || '',
                 toggleOne(id, checked) {
@@ -242,6 +306,11 @@
                         return;
                     }
                     this.selectedIds = [];
+                },
+                submitSingleDelete() {
+                    if (!this.singleDeleteFormId) return;
+                    const form = document.getElementById(this.singleDeleteFormId);
+                    if (form) form.submit();
                 },
                 init() {
                     if (typeof flatpickr === 'undefined') {

@@ -60,8 +60,10 @@ Route::prefix('admin')
         Route::get('/editais/{edital}/inscricoes', [AdminInscricaoController::class, 'byEdital'])->name('editais.inscricoes.index');
         Route::get('/inscricoes/{inscricao}', [AdminInscricaoController::class, 'show'])->name('inscricoes.show');
         Route::put('/inscricoes/{inscricao}', [AdminInscricaoController::class, 'update'])->name('inscricoes.update');
+        Route::delete('/inscricoes/{inscricao}', [AdminInscricaoController::class, 'destroy'])->name('inscricoes.destroy');
         Route::post('/inscricoes/{inscricao}/status', [AdminInscricaoController::class, 'updateStatus'])->name('inscricoes.status');
         Route::post('/inscricoes/status/lote', [AdminInscricaoController::class, 'bulkUpdateStatus'])->name('inscricoes.status.bulk');
+        Route::post('/inscricoes/excluir/lote', [AdminInscricaoController::class, 'bulkDestroy'])->name('inscricoes.destroy.bulk');
         Route::put('/inscricoes/{inscricao}/documentos/{doc}', [AdminInscricaoController::class, 'updateDocumento'])->name('inscricoes.documentos.update');
         Route::delete('/inscricoes/{inscricao}/documentos/{doc}', [AdminInscricaoController::class, 'destroyDocumento'])->name('inscricoes.documentos.destroy');
         Route::post('/inscricoes/{inscricao}/homologar', [AdminInscricaoController::class, 'homologar'])->name('inscricoes.homologar');
