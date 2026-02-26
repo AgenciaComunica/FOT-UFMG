@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -27,18 +28,33 @@ class PasswordResetLinkController extends Controller
     {
         $request->validate([
             'email' => ['required', 'email'],
+        ], [
+            'email.required' => 'Informe seu e-mail.',
+            'email.email' => 'Informe um e-mail válido.',
         ]);
 
-        // We will send the password reset link to this user. Once we have attempted
-        // to send the link, we will examine the response then see the message we
-        // need to show to the user. Finally, we'll send out a proper response.
+        $email = trim((string) $request->string('email')->value());
+        $user = User::query()->where('email', $email)->first();
+
+        if (! $user) {
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'Não encontramos uma conta com esse e-mail.']);
+        }
+
+        if (! in_array($user->role, [User::ROLE_ADMIN, User::ROLE_DOCENTE], true)) {
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'Recuperação de senha disponível apenas para secretaria e docentes.']);
+        }
+
         $status = Password::sendResetLink(
-            $request->only('email')
+            ['email' => $email]
         );
 
-        return $status == Password::RESET_LINK_SENT
-                    ? back()->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
+        return $status === Password::RESET_LINK_SENT
+            ? back()->with('status', 'Link de redefinição enviado com sucesso.')
+            : back()->withInput($request->only('email'))
+                ->withErrors(['email' => 'Não foi possível enviar o link de redefinição agora. Tente novamente em instantes.']);
     }
 }

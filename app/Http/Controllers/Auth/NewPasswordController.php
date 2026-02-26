@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -18,8 +19,22 @@ class NewPasswordController extends Controller
     /**
      * Display the password reset view.
      */
-    public function create(Request $request): View
+    public function create(Request $request): View|RedirectResponse
     {
+        $token = (string) $request->route('token');
+        $email = trim((string) $request->string('email')->value());
+
+        /** @var CanResetPassword|null $user */
+        $user = $email !== ''
+            ? User::query()->where('email', $email)->first()
+            : null;
+
+        if (! $user || ! Password::broker()->tokenExists($user, $token)) {
+            return redirect()
+                ->route('password.request')
+                ->withErrors(['email' => 'Este link de redefinição é inválido, expirou ou já foi utilizado.']);
+        }
+
         return view('auth.reset-password', ['request' => $request]);
     }
 
@@ -34,6 +49,9 @@ class NewPasswordController extends Controller
             'token' => ['required'],
             'email' => ['required', 'email'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+        ], [
+            'password.required' => 'Informe a nova senha.',
+            'password.confirmed' => 'Senhas diferentes.',
         ]);
 
         // Here we will attempt to reset the user's password. If it is successful we
@@ -55,8 +73,8 @@ class NewPasswordController extends Controller
         // the application's home authenticated view. If there is an error we can
         // redirect them back to where they came from with their error message.
         return $status == Password::PASSWORD_RESET
-                    ? redirect()->route('login')->with('status', __($status))
+                    ? redirect()->route('login')->with('status', 'Senha redefinida com sucesso. Faça login com a nova senha.')
                     : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
+                        ->withErrors(['email' => 'Não foi possível redefinir a senha com este link. Solicite um novo link de recuperação.']);
     }
 }
