@@ -17,7 +17,7 @@
                 </div>
             </div>
 
-            <form method="POST" action="{{ route('password.email') }}" class="space-y-4">
+            <form method="POST" action="{{ route('password.email') }}" class="space-y-4" x-data="{ submitting: false }" @submit="submitting = true">
                 @csrf
 
                 <div>
@@ -27,8 +27,9 @@
                 </div>
 
                 <div class="flex items-center justify-end">
-                    <x-primary-button class="rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold tracking-wide text-white hover:bg-slate-800 focus:bg-slate-800 active:bg-slate-900">
-                        Enviar link de redefinição
+                    <x-primary-button :disabled="submitting" class="rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold tracking-wide text-white hover:bg-slate-800 focus:bg-slate-800 active:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-70">
+                        <span x-show="!submitting">Enviar link de redefinição</span>
+                        <span x-show="submitting" style="display:none;">Enviando...</span>
                     </x-primary-button>
                 </div>
             </form>
