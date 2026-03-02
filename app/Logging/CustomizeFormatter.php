@@ -2,8 +2,8 @@
 
 namespace App\Logging;
 
+use Illuminate\Log\Logger;
 use Monolog\Formatter\LineFormatter;
-use Monolog\Logger;
 
 class CustomizeFormatter
 {
@@ -17,9 +17,10 @@ class CustomizeFormatter
         $formatter = new LineFormatter($format, $dateFormat, true, true);
         $formatter->includeStacktraces(true);
 
-        foreach ($logger->getHandlers() as $handler) {
+        $monolog = $logger->getLogger();
+
+        foreach ($monolog->getHandlers() as $handler) {
             $handler->setFormatter($formatter);
         }
     }
 }
-
