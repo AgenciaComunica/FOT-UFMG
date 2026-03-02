@@ -8,16 +8,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('edital_docentes', function (Blueprint $table) {
-            $table->boolean('aprovador')->default(false)->after('ordem');
-        });
+        if (! Schema::hasColumn('edital_docentes', 'aprovador')) {
+            Schema::table('edital_docentes', function (Blueprint $table) {
+                $table->boolean('aprovador')->default(false)->after('ordem');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('edital_docentes', function (Blueprint $table) {
-            $table->dropColumn('aprovador');
-        });
+        if (Schema::hasColumn('edital_docentes', 'aprovador')) {
+            Schema::table('edital_docentes', function (Blueprint $table) {
+                $table->dropColumn('aprovador');
+            });
+        }
     }
 };
-
