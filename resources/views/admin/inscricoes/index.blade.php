@@ -90,7 +90,7 @@
                             </td>
                             <td>{{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</td>
                             <td>
-                                <div class="relative inline-block text-left">
+                                <div class="relative inline-block text-left" style="position: relative;">
                                     <form method="POST" id="delete-inscricao-{{ $inscricao->id }}" action="{{ route('admin.inscricoes.destroy', $inscricao) }}" class="hidden">
                                         @csrf
                                         @method('DELETE')
@@ -112,7 +112,7 @@
                                         x-transition
                                         @click.away="dropdownOpenId = null"
                                         class="absolute right-0 z-20 mt-2 w-40 rounded-md border border-slate-200 bg-white p-1 shadow-lg"
-                                        style="display: none;"
+                                        style="display: none; position: absolute; right: 0; top: 100%; z-index: 60;"
                                     >
                                         <a href="{{ route('admin.inscricoes.show', $inscricao) }}" class="flex w-full items-center rounded-md px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100" @click="dropdownOpenId = null">
                                             Ver detalhes

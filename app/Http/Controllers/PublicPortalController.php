@@ -9,6 +9,7 @@ use App\Models\Inscricao;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -139,7 +140,14 @@ class PublicPortalController extends Controller
 
         try {
             Mail::to($inscricao->email)->send(new InscricaoInformacoesCompletasMail($inscricao));
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            Log::error('Falha ao enviar e-mail de informações completas da inscrição.', [
+                'inscricao_id' => $inscricao->id,
+                'protocolo' => $inscricao->protocolo,
+                'email' => $inscricao->email,
+                'exception' => $e->getMessage(),
+            ]);
+
             return redirect()
                 ->route('home', ['tab' => 'verificar'])
                 ->with([
@@ -220,7 +228,14 @@ class PublicPortalController extends Controller
 
         try {
             Mail::to($inscricao->email)->send(new InscricaoEditarLinkMail($inscricao->fresh(['edital']), $editUrl));
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            Log::error('Falha ao enviar e-mail de link de edição da inscrição.', [
+                'inscricao_id' => $inscricao->id,
+                'protocolo' => $inscricao->protocolo,
+                'email' => $inscricao->email,
+                'exception' => $e->getMessage(),
+            ]);
+
             return redirect()
                 ->route('home', ['tab' => 'verificar'])
                 ->with([

@@ -20,7 +20,7 @@ class PublicUpdateInscricaoRequest extends FormRequest
 
         return [
             'nome_completo' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255'],
+            'email' => ['required', 'email:rfc,dns', 'max:255'],
             'cpf' => ['required', 'string', 'max:20'],
             'telefone' => ['nullable', 'string', 'max:30'],
             'inicio_programa_semestre' => ['required', 'integer', 'in:1,2'],
