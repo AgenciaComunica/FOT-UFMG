@@ -41,7 +41,7 @@
             </div>
         </form>
 
-        <div class="table-wrap">
+        <div class="table-wrap" style="overflow-x: auto; overflow-y: visible;">
             <table class="table-base">
                 <thead>
                     <tr>
@@ -109,13 +109,12 @@
 
                                     <div
                                         x-show="dropdownOpenId === {{ $inscricao->id }}"
-                                        x-transition
                                         @click.away="dropdownOpenId = null"
                                         class="absolute right-0 z-20 mt-2 w-40 rounded-md border border-slate-200 bg-white p-1 shadow-lg"
                                         style="display: none; position: absolute; right: 0; top: 100%; z-index: 60;"
                                     >
                                         <a href="{{ route('admin.inscricoes.show', $inscricao) }}" class="flex w-full items-center rounded-md px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100" @click="dropdownOpenId = null">
-                                            Ver detalhes
+                                            Ver
                                         </a>
                                         <button
                                             type="button"
