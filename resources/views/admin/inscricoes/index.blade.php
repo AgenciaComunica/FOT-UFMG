@@ -106,12 +106,11 @@
                                             <path d="M10 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" />
                                         </svg>
                                     </button>
-
                                     <div
                                         x-show="dropdownOpenId === {{ $inscricao->id }}"
                                         @click.away="dropdownOpenId = null"
-                                        class="absolute right-0 z-20 mt-2 w-40 rounded-md border border-slate-200 bg-white p-1 shadow-lg"
-                                        style="display: none; position: absolute; right: 0; top: 100%; z-index: 60;"
+                                        class="absolute right-0 mt-2 w-40 rounded-md border border-slate-200 bg-white p-1 shadow-lg"
+                                        style="display: none; position: absolute; right: 0; top: 100%; z-index: 9999;"
                                     >
                                         <a href="{{ route('admin.inscricoes.show', $inscricao) }}" class="flex w-full items-center rounded-md px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100" @click="dropdownOpenId = null">
                                             Ver
@@ -171,7 +170,6 @@
         </div>
 
     </div>
-
     <div x-show="confirmDeleteOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="confirmDeleteOpen=false">
         <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
             <h3 class="text-lg font-bold text-slate-900">Confirmar exclusão</h3>
