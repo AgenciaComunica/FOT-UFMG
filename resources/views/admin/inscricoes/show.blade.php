@@ -105,12 +105,30 @@
                         </p>
                         <p><strong>CPF:</strong> {{ $inscricao->cpf }}</p>
                         <p><strong>Telefone:</strong> {{ $inscricao->telefone ?: '-' }}</p>
+                        <p><strong>Início desejado:</strong> {{ $inscricao->inicio_programa_semestre ? $inscricao->inicio_programa_semestre.'º semestre/'.$inscricao->inicio_programa_ano : '-' }}</p>
                         <p><strong>Status:</strong> <span class="status-badge {{ $statusClass }}">{{ $statusLabel }}</span></p>
                         <p><strong>Enviado em:</strong> {{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</p>
+                        <p><strong>Última edição:</strong> {{ optional($inscricao->ultimaEdicao?->edited_at)->format('d/m/Y H:i') ?: '-' }}</p>
                         <p><strong>Decidido em:</strong> {{ optional($inscricao->decided_at)->format('d/m/Y H:i') ?: '-' }}</p>
                         <p><strong>Decidido por:</strong> {{ optional($inscricao->decidedByUser)->name ?: '-' }}</p>
                         <p><strong>Motivo indeferimento:</strong> {{ $inscricao->indeferimento_motivo ?: '-' }}</p>
                     </div>
+                </div>
+
+                <div class="mt-4 rounded-xl border border-slate-200 p-4">
+                    <h3 class="text-sm font-semibold text-slate-800">Histórico de edições</h3>
+                    @if ($inscricao->edicoes->isEmpty())
+                        <p class="mt-2 text-sm text-slate-500">Nenhuma edição registrada pelo candidato.</p>
+                    @else
+                        <ul class="mt-2 space-y-2">
+                            @foreach ($inscricao->edicoes as $edicao)
+                                <li class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                                    <p><strong>Data:</strong> {{ optional($edicao->edited_at)->format('d/m/Y H:i') ?: '-' }}</p>
+                                    <p class="mt-1"><strong>Motivo:</strong> {{ $edicao->motivo }}</p>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
                 </div>
             </div>
 
@@ -313,6 +331,23 @@
                         <div class="md:col-span-2">
                             <x-input-label for="telefone" value="Telefone" />
                             <x-text-input id="telefone" name="telefone" type="text" class="input-base mt-1" :value="old('telefone', $inscricao->telefone)" />
+                        </div>
+                        <div>
+                            <x-input-label for="inicio_programa_semestre" value="Semestre desejado" />
+                            <select id="inicio_programa_semestre" name="inicio_programa_semestre" class="input-base mt-1" required>
+                                <option value="">Selecione</option>
+                                <option value="1" @selected((int) old('inicio_programa_semestre', $inscricao->inicio_programa_semestre) === 1)>1º semestre</option>
+                                <option value="2" @selected((int) old('inicio_programa_semestre', $inscricao->inicio_programa_semestre) === 2)>2º semestre</option>
+                            </select>
+                        </div>
+                        <div>
+                            <x-input-label for="inicio_programa_ano" value="Ano desejado" />
+                            <select id="inicio_programa_ano" name="inicio_programa_ano" class="input-base mt-1" required>
+                                <option value="">Selecione</option>
+                                @for ($ano = now()->year; $ano <= now()->year + 10; $ano++)
+                                    <option value="{{ $ano }}" @selected((int) old('inicio_programa_ano', $inscricao->inicio_programa_ano) === $ano)>{{ $ano }}</option>
+                                @endfor
+                            </select>
                         </div>
                     </div>
                     <div class="flex justify-end gap-2 pt-2">

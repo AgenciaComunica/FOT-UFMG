@@ -19,6 +19,9 @@ Route::post('/inscricoes/verificar', [PublicPortalController::class, 'verificarI
 Route::post('/inscricoes/{inscricao}/enviar-informacoes', [PublicPortalController::class, 'enviarInformacoesCompletas'])
     ->middleware('throttle:4,1')
     ->name('public.inscricoes.enviar-informacoes');
+Route::post('/inscricoes/{inscricao}/enviar-link-edicao', [PublicPortalController::class, 'enviarLinkEdicao'])
+    ->middleware('throttle:4,1')
+    ->name('public.inscricoes.enviar-link-edicao');
 
 Route::get('/editais/{edital}/inscricao', [PublicInscricaoController::class, 'create'])->name('public.inscricao.create');
 Route::get('/editais/{edital}/arquivo', [PublicPortalController::class, 'downloadEdital'])->name('public.editais.download');
@@ -34,6 +37,10 @@ Route::get('/inscricoes/{inscricao}/verificar-email/{token}', [PublicInscricaoCo
 Route::post('/inscricoes/{inscricao}/reenviar-verificacao', [PublicInscricaoController::class, 'reenviarVerificacao'])
     ->middleware('throttle:4,1')
     ->name('public.inscricao.email.reenviar');
+Route::get('/inscricoes/{inscricao}/editar/{token}', [PublicInscricaoController::class, 'editWithToken'])
+    ->name('public.inscricoes.editar');
+Route::put('/inscricoes/{inscricao}/editar/{token}', [PublicInscricaoController::class, 'updateWithToken'])
+    ->name('public.inscricoes.editar.update');
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardRedirectController::class)->name('dashboard');

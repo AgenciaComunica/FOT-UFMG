@@ -199,6 +199,8 @@ class InscricaoController extends Controller
             'user',
             'decidedByUser',
             'avaliacoes.docente',
+            'ultimaEdicao',
+            'edicoes' => fn ($q) => $q->latest('edited_at'),
         ]);
 
         $avaliacoesByDocente = $inscricao->avaliacoes->keyBy('docente_id');
@@ -243,6 +245,8 @@ class InscricaoController extends Controller
             'email' => $data['email'],
             'cpf' => $data['cpf'],
             'telefone' => $data['telefone'] ?? null,
+            'inicio_programa_semestre' => (int) $data['inicio_programa_semestre'],
+            'inicio_programa_ano' => (int) $data['inicio_programa_ano'],
             'email_verified_at' => $emailAlterado ? null : $inscricao->email_verified_at,
             'email_verification_token' => $emailAlterado ? hash('sha256', Str::uuid().'|'.$data['email']) : $inscricao->email_verification_token,
             'verification_sent_at' => $emailAlterado ? null : $inscricao->verification_sent_at,

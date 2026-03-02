@@ -6,7 +6,7 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ showFilters: false, confirmDeleteOpen: false, deleteFormId: '', deleteLabel: '' }">
+    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ showFilters: false, confirmDeleteOpen: false, deleteFormId: '', deleteLabel: '', dropdownOpenId: null }">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <button type="button" class="btn-muted" @click="showFilters = !showFilters">Filtros</button>
             <div class="flex flex-wrap gap-2">
@@ -73,7 +73,11 @@
                             };
                         @endphp
                         <tr>
-                            <td class="font-semibold text-slate-700">{{ $inscricao->protocolo }}</td>
+                            <td class="font-semibold">
+                                <a href="{{ route('admin.inscricoes.show', $inscricao) }}" class="text-slate-700 hover:text-blue-700 hover:underline">
+                                    {{ $inscricao->protocolo }}
+                                </a>
+                            </td>
                             <td>{{ $inscricao->nome_completo }}</td>
                             <td>{{ $inscricao->email }}</td>
                             <td><span class="status-badge {{ $statusClass }}">{{ $statusLabel }}</span></td>
@@ -86,27 +90,41 @@
                             </td>
                             <td>{{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</td>
                             <td>
-                                <div class="flex items-center gap-2">
-                                    <a href="{{ route('admin.inscricoes.show', $inscricao) }}"
-                                       class="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path d="M10 3C5 3 1.73 7.11 1 9c.73 1.89 4 6 9 6s8.27-4.11 9-6c-.73-1.89-4-6-9-6zm0 10a4 4 0 110-8 4 4 0 010 8z" />
-                                        </svg>
-                                        Ver detalhes
-                                    </a>
+                                <div class="relative inline-block text-left">
                                     <form method="POST" id="delete-inscricao-{{ $inscricao->id }}" action="{{ route('admin.inscricoes.destroy', $inscricao) }}" class="hidden">
                                         @csrf
                                         @method('DELETE')
                                     </form>
-                                    <button type="button"
-                                        @click="deleteFormId='delete-inscricao-{{ $inscricao->id }}'; deleteLabel='{{ $inscricao->protocolo }}'; confirmDeleteOpen=true"
-                                        class="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M6 8a1 1 0 011 1v6a1 1 0 102 0V9a1 1 0 112 0v6a1 1 0 102 0V9a1 1 0 112 0v6a3 3 0 11-6 0 3 3 0 11-6 0V9a1 1 0 011-1z" clip-rule="evenodd" />
-                                            <path d="M4 5a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z" />
+                                    <button
+                                        type="button"
+                                        class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50"
+                                        @click="dropdownOpenId = dropdownOpenId === {{ $inscricao->id }} ? null : {{ $inscricao->id }}"
+                                        :aria-expanded="dropdownOpenId === {{ $inscricao->id }}"
+                                    >
+                                        <span class="sr-only">Ações</span>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M10 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" />
                                         </svg>
-                                        Excluir
                                     </button>
+
+                                    <div
+                                        x-show="dropdownOpenId === {{ $inscricao->id }}"
+                                        x-transition
+                                        @click.away="dropdownOpenId = null"
+                                        class="absolute right-0 z-20 mt-2 w-40 rounded-md border border-slate-200 bg-white p-1 shadow-lg"
+                                        style="display: none;"
+                                    >
+                                        <a href="{{ route('admin.inscricoes.show', $inscricao) }}" class="flex w-full items-center rounded-md px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100" @click="dropdownOpenId = null">
+                                            Ver detalhes
+                                        </a>
+                                        <button
+                                            type="button"
+                                            class="flex w-full items-center rounded-md px-3 py-2 text-sm text-red-700 transition hover:bg-red-50"
+                                            @click="deleteFormId='delete-inscricao-{{ $inscricao->id }}'; deleteLabel='{{ $inscricao->protocolo }}'; confirmDeleteOpen=true; dropdownOpenId = null"
+                                        >
+                                            Excluir
+                                        </button>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -153,18 +171,19 @@
             </div>
         </div>
 
-        <div x-show="confirmDeleteOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="confirmDeleteOpen=false">
-            <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
-                <h3 class="text-lg font-bold text-slate-900">Confirmar exclusão</h3>
-                <p class="mt-2 text-sm text-slate-600">
-                    Deseja realmente excluir a inscrição
-                    <span class="font-semibold text-slate-800" x-text="deleteLabel"></span>?
-                </p>
-                <p class="mt-1 text-xs text-red-600">Esta ação é irreversível.</p>
-                <div class="mt-4 flex justify-end gap-2">
-                    <button type="button" class="btn-muted" @click="confirmDeleteOpen=false">Cancelar</button>
-                    <button type="button" class="btn-danger" @click="if (deleteFormId) { const form = document.getElementById(deleteFormId); if (form) form.submit(); }">Excluir</button>
-                </div>
+    </div>
+
+    <div x-show="confirmDeleteOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="confirmDeleteOpen=false">
+        <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+            <h3 class="text-lg font-bold text-slate-900">Confirmar exclusão</h3>
+            <p class="mt-2 text-sm text-slate-600">
+                Deseja realmente excluir a inscrição
+                <span class="font-semibold text-slate-800" x-text="deleteLabel"></span>?
+            </p>
+            <p class="mt-1 text-xs text-red-600">Esta ação é irreversível.</p>
+            <div class="mt-4 flex justify-end gap-2">
+                <button type="button" class="btn-muted" @click="confirmDeleteOpen=false">Cancelar</button>
+                <button type="button" class="btn-danger" @click="if (deleteFormId) { const form = document.getElementById(deleteFormId); if (form) form.submit(); }">Excluir</button>
             </div>
         </div>
     </div>
