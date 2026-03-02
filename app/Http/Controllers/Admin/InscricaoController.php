@@ -18,6 +18,7 @@ use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Schema;
@@ -894,7 +895,13 @@ class InscricaoController extends Controller
             Mail::to($inscricao->email)->send(
                 new InscricaoRecebidaMail($inscricao, $verificationUrl, $statusUrl)
             );
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            Log::error('Falha ao enviar e-mail de verificação da inscrição (admin).', [
+                'inscricao_id' => $inscricao->id,
+                'protocolo' => $inscricao->protocolo,
+                'email' => $inscricao->email,
+                'exception' => $e->getMessage(),
+            ]);
         }
     }
 

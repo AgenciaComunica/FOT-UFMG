@@ -21,7 +21,7 @@ class PublicStoreInscricaoRequest extends FormRequest
 
         return [
             'nome_completo' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique(Inscricao::class, 'email')],
+            'email' => ['required', 'email:rfc,dns', 'max:255', Rule::unique(Inscricao::class, 'email')],
             'cpf' => ['required', 'string', 'max:20', Rule::unique(Inscricao::class, 'cpf')],
             'telefone' => ['nullable', 'string', 'max:30'],
             'inicio_programa_semestre' => ['required', 'integer', 'in:1,2'],
