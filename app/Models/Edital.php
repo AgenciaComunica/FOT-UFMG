@@ -6,10 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
 
 class Edital extends Model
 {
     use HasFactory;
+
+    private static ?bool $pivotHasAprovador = null;
 
     public const CORTE_FIXA = 'FIXA';
     public const CORTE_MEDIA_FLUTUANTE = 'MEDIA_FLUTUANTE';
@@ -60,10 +63,16 @@ class Edital extends Model
 
     public function docentesBanca(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'edital_docentes')
-            ->withPivot('ordem', 'aprovador')
+        $relation = $this->belongsToMany(User::class, 'edital_docentes')
+            ->withPivot('ordem')
             ->withTimestamps()
             ->orderBy('edital_docentes.ordem');
+
+        if (self::hasPivotAprovadorColumn()) {
+            $relation->withPivot('aprovador');
+        }
+
+        return $relation;
     }
 
     public function getStatusAttribute(): string
@@ -93,5 +102,21 @@ class Edital extends Model
     public function hasArquivoEdital(): bool
     {
         return filled($this->arquivo_path);
+    }
+
+    private static function hasPivotAprovadorColumn(): bool
+    {
+        if (self::$pivotHasAprovador !== null) {
+            return self::$pivotHasAprovador;
+        }
+
+        try {
+            self::$pivotHasAprovador = Schema::hasTable('edital_docentes')
+                && Schema::hasColumn('edital_docentes', 'aprovador');
+        } catch (\Throwable) {
+            self::$pivotHasAprovador = false;
+        }
+
+        return self::$pivotHasAprovador;
     }
 }
