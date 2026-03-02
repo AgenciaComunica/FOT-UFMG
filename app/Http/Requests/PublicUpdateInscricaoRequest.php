@@ -5,10 +5,9 @@ namespace App\Http\Requests;
 use App\Models\Edital;
 use App\Models\Inscricao;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
-class PublicStoreInscricaoRequest extends FormRequest
+class PublicUpdateInscricaoRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -21,39 +20,69 @@ class PublicStoreInscricaoRequest extends FormRequest
 
         return [
             'nome_completo' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique(Inscricao::class, 'email')],
-            'cpf' => ['required', 'string', 'max:20', Rule::unique(Inscricao::class, 'cpf')],
+            'email' => ['required', 'email', 'max:255'],
+            'cpf' => ['required', 'string', 'max:20'],
             'telefone' => ['nullable', 'string', 'max:30'],
             'inicio_programa_semestre' => ['required', 'integer', 'in:1,2'],
             'inicio_programa_ano' => ['required', 'integer', 'min:'.now()->year, 'max:'.(now()->year + 10)],
+            'motivo_edicao' => ['required', 'string', 'min:5', 'max:1000'],
             'documentos' => ['nullable', 'array'],
             'documentos.*' => ['nullable', 'file', 'max:'.$maxPdfKb],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'motivo_edicao.required' => 'Informe o motivo da edição para continuar.',
+            'motivo_edicao.min' => 'Descreva o motivo da edição com pelo menos 5 caracteres.',
+            'motivo_edicao.max' => 'O motivo da edição pode ter no máximo 1000 caracteres.',
         ];
     }
 
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
-            $honeypotField = config('inscricoes.honeypot_field', 'website');
-
-            if (filled($this->input($honeypotField))) {
-                $validator->errors()->add('form', 'Não foi possível processar a inscrição.');
-            }
-
-            /** @var Edital|null $edital */
-            $edital = $this->route('edital');
-            if (! $edital || ! $edital->isAberto()) {
-                $validator->errors()->add('edital', 'As inscrições para este edital estão encerradas.');
-
+            /** @var Inscricao|null $inscricao */
+            $inscricao = $this->route('inscricao');
+            if (! $inscricao) {
+                $validator->errors()->add('form', 'Inscrição inválida.');
                 return;
             }
 
-            $edital->loadMissing('documentosRequeridos');
-            $requiredDocs = $edital->documentosRequeridos->where('obrigatorio', true);
+            /** @var Edital|null $edital */
+            $edital = $inscricao->edital()->with('documentosRequeridos')->first();
+            if (! $edital || ! $edital->isAberto()) {
+                $validator->errors()->add('form', 'A edição só pode ser realizada com o edital aberto.');
+                return;
+            }
 
-            foreach ($requiredDocs as $doc) {
-                if (! $this->hasFile('documentos.'.$doc->id)) {
-                    $validator->errors()->add('documentos.'.$doc->id, 'Documento obrigatório não enviado.');
+            if (in_array($inscricao->status, [Inscricao::STATUS_HOMOLOGADA, Inscricao::STATUS_INDEFERIDA], true)) {
+                $validator->errors()->add('form', 'A inscrição já possui decisão final e não pode ser editada.');
+                return;
+            }
+
+            $email = mb_strtolower(trim((string) $this->input('email')));
+            if ($email !== '') {
+                $emailExists = Inscricao::query()
+                    ->where('id', '!=', $inscricao->id)
+                    ->whereRaw('LOWER(email) = ?', [$email])
+                    ->exists();
+
+                if ($emailExists) {
+                    $validator->errors()->add('email', 'Este e-mail já possui outra inscrição cadastrada.');
+                }
+            }
+
+            $cpfDigits = preg_replace('/\D+/', '', (string) $this->input('cpf')) ?: '';
+            if ($cpfDigits !== '') {
+                $cpfExists = Inscricao::query()
+                    ->where('id', '!=', $inscricao->id)
+                    ->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), '/', ''), ' ', '') = ?", [$cpfDigits])
+                    ->exists();
+
+                if ($cpfExists) {
+                    $validator->errors()->add('cpf', 'Este CPF já possui outra inscrição cadastrada.');
                 }
             }
 
@@ -101,30 +130,6 @@ class PublicStoreInscricaoRequest extends FormRequest
                     $validator->errors()->add('documentos.'.$docId, 'MIME inválido para o formato enviado.');
                 }
             }
-
-            $cpfDigits = preg_replace('/\D+/', '', (string) $this->input('cpf'));
-            if ($cpfDigits !== '') {
-                $cpfExists = Inscricao::query()
-                    ->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), '/', ''), ' ', '') = ?", [$cpfDigits])
-                    ->exists();
-
-                if ($cpfExists) {
-                    $validator->errors()->add('cpf', 'Este CPF já possui uma inscrição cadastrada. Em caso de erro, entre em contato com a secretaria.');
-                }
-            }
         });
-    }
-
-    public function messages(): array
-    {
-        return [
-            'email.unique' => 'Este e-mail já possui uma inscrição cadastrada. Em caso de erro, entre em contato com a secretaria.',
-            'cpf.unique' => 'Este CPF já possui uma inscrição cadastrada. Em caso de erro, entre em contato com a secretaria.',
-            'inicio_programa_semestre.required' => 'Selecione o semestre desejado para início.',
-            'inicio_programa_semestre.in' => 'Semestre inválido. Selecione 1º ou 2º semestre.',
-            'inicio_programa_ano.required' => 'Selecione o ano desejado para início.',
-            'inicio_programa_ano.min' => 'Ano de início inválido.',
-            'inicio_programa_ano.max' => 'Ano de início inválido.',
-        ];
     }
 }

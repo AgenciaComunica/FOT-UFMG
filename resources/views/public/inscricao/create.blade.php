@@ -5,8 +5,10 @@
             nome: @js(old('nome_completo', '')),
             email: @js(old('email', '')),
             cpf: @js(old('cpf', '')),
+            semestre: @js((string) old('inicio_programa_semestre', '')),
+            ano: @js((string) old('inicio_programa_ano', '')),
             canGoDocs() {
-                return this.nome.trim() !== '' && this.email.trim() !== '' && this.cpf.trim() !== '';
+                return this.nome.trim() !== '' && this.email.trim() !== '' && this.cpf.trim() !== '' && this.semestre.trim() !== '' && this.ano.trim() !== '';
             }
         }"
         class="space-y-5"
@@ -76,6 +78,26 @@
                 <div>
                     <x-input-label for="email" value="Email" />
                     <x-text-input id="email" name="email" type="email" class="input-base" :value="old('email')" x-model="email" required />
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <div>
+                        <x-input-label for="inicio_programa_semestre" value="Semestre desejado para início" />
+                        <select id="inicio_programa_semestre" name="inicio_programa_semestre" class="input-base" x-model="semestre" required>
+                            <option value="">Selecione</option>
+                            <option value="1" @selected(old('inicio_programa_semestre') == 1)>1º semestre</option>
+                            <option value="2" @selected(old('inicio_programa_semestre') == 2)>2º semestre</option>
+                        </select>
+                    </div>
+                    <div>
+                        <x-input-label for="inicio_programa_ano" value="Ano desejado para início" />
+                        <select id="inicio_programa_ano" name="inicio_programa_ano" class="input-base" x-model="ano" required>
+                            <option value="">Selecione</option>
+                            @for ($ano = now()->year; $ano <= now()->year + 10; $ano++)
+                                <option value="{{ $ano }}" @selected((int) old('inicio_programa_ano') === $ano)>{{ $ano }}</option>
+                            @endfor
+                        </select>
+                    </div>
                 </div>
 
                 <div class="flex justify-end">

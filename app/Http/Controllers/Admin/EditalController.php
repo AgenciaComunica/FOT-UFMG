@@ -266,8 +266,13 @@ class EditalController extends Controller
     public function store(AdminStoreEditalRequest $request): RedirectResponse
     {
         $data = $request->validated();
-        $isDraft = $request->input('submit_action') === 'draft';
-        $publicado = $isDraft ? false : (bool) ($data['publicado'] ?? false);
+        $submitAction = (string) $request->input('submit_action', 'publish');
+        $isDraft = $submitAction === 'draft';
+        $publicado = match ($submitAction) {
+            'draft' => false,
+            'publish' => true,
+            default => (bool) ($data['publicado'] ?? false),
+        };
         $gotoNewDocente = $request->boolean('goto_new_docente');
         $inicio = $this->resolveDateTimeForPersist($data['periodo_inscricao_inicio'] ?? null, false);
         $fim = $this->resolveDateTimeForPersist($data['periodo_inscricao_fim'] ?? null, true);
@@ -354,8 +359,13 @@ class EditalController extends Controller
     {
         $data = $request->validated();
         $wasPublicado = (bool) $edital->publicado;
-        $isDraft = $request->input('submit_action') === 'draft';
-        $publicado = $isDraft ? false : (bool) ($data['publicado'] ?? false);
+        $submitAction = (string) $request->input('submit_action', 'publish');
+        $isDraft = $submitAction === 'draft';
+        $publicado = match ($submitAction) {
+            'draft' => false,
+            'publish' => true,
+            default => (bool) ($data['publicado'] ?? $edital->publicado),
+        };
         $gotoNewDocente = $request->boolean('goto_new_docente');
         $inicio = $this->resolveDateTimeForPersist($data['periodo_inscricao_inicio'] ?? null, false, $edital->periodo_inscricao_inicio);
         $fim = $this->resolveDateTimeForPersist($data['periodo_inscricao_fim'] ?? null, true, $edital->periodo_inscricao_fim);

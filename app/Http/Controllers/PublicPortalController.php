@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\InscricaoEditarLinkMail;
 use App\Mail\InscricaoInformacoesCompletasMail;
 use App\Models\Edital;
 use App\Models\Inscricao;
@@ -10,6 +11,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -75,6 +77,8 @@ class PublicPortalController extends Controller
             'consultaTermo' => $request->session()->pull('consulta_termo', ''),
             'infoEmailError' => $request->session()->pull('info_email_error', ''),
             'infoEmailTargetId' => (int) $request->session()->pull('info_email_target_id', 0),
+            'editLinkError' => $request->session()->pull('edit_link_error', ''),
+            'editLinkTargetId' => (int) $request->session()->pull('edit_link_target_id', 0),
             'honeypotField' => config('inscricoes.honeypot_field', 'website'),
         ]);
     }
@@ -152,6 +156,87 @@ class PublicPortalController extends Controller
                 'consulta_resultados' => $resultados,
                 'consulta_termo' => $consultaTermo,
                 'status' => 'Informações completas enviadas para o e-mail cadastrado.',
+            ]);
+    }
+
+    public function enviarLinkEdicao(Request $request, Inscricao $inscricao): RedirectResponse
+    {
+        abort_unless($inscricao->edital?->publicado, 404);
+
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:160'],
+            'consulta_termo' => ['nullable', 'string', 'max:160'],
+        ], [
+            'email.required' => 'Informe o e-mail para envio.',
+            'email.email' => 'Informe um e-mail válido.',
+        ]);
+
+        $consultaTermo = trim((string) ($validated['consulta_termo'] ?? ''));
+        if ($consultaTermo === '') {
+            $consultaTermo = $inscricao->protocolo;
+        }
+
+        $resultados = $this->buildConsultaResultados($consultaTermo);
+        $emailInformado = mb_strtolower(trim((string) $validated['email']));
+        $emailInscricao = mb_strtolower(trim((string) $inscricao->email));
+
+        if ($emailInformado !== $emailInscricao) {
+            return redirect()
+                ->route('home', ['tab' => 'verificar'])
+                ->with([
+                    'consulta_resultados' => $resultados,
+                    'consulta_termo' => $consultaTermo,
+                    'edit_link_error' => 'Se o e-mail não confere ou não for lembrado, entre em contato com a secretaria com urgência.',
+                    'edit_link_target_id' => $inscricao->id,
+                ]);
+        }
+
+        if (! $inscricao->edital?->isAberto() || $inscricao->status !== Inscricao::STATUS_RECEBIDA) {
+            return redirect()
+                ->route('home', ['tab' => 'verificar'])
+                ->with([
+                    'consulta_resultados' => $resultados,
+                    'consulta_termo' => $consultaTermo,
+                    'edit_link_error' => 'A edição está disponível apenas para inscrições em análise, durante o período aberto do edital.',
+                    'edit_link_target_id' => $inscricao->id,
+                ]);
+        }
+
+        $rawToken = Str::random(64);
+        $hours = max(1, (int) config('inscricoes.edit_link_hours', 24));
+        $expiresAt = now()->addHours($hours);
+
+        $inscricao->forceFill([
+            'edit_link_token' => hash('sha256', $rawToken),
+            'edit_link_sent_at' => now(),
+            'edit_link_expires_at' => $expiresAt,
+            'edit_link_used_at' => null,
+        ])->save();
+
+        $editUrl = route('public.inscricoes.editar', [
+            'inscricao' => $inscricao->id,
+            'token' => $rawToken,
+        ]);
+
+        try {
+            Mail::to($inscricao->email)->send(new InscricaoEditarLinkMail($inscricao->fresh(['edital']), $editUrl));
+        } catch (\Throwable) {
+            return redirect()
+                ->route('home', ['tab' => 'verificar'])
+                ->with([
+                    'consulta_resultados' => $resultados,
+                    'consulta_termo' => $consultaTermo,
+                    'edit_link_error' => 'Não foi possível enviar o link de edição agora. Tente novamente em instantes.',
+                    'edit_link_target_id' => $inscricao->id,
+                ]);
+        }
+
+        return redirect()
+            ->route('home', ['tab' => 'verificar'])
+            ->with([
+                'consulta_resultados' => $resultados,
+                'consulta_termo' => $consultaTermo,
+                'status' => 'Link para edição enviado. O link expira em 24 horas e pode ser usado uma única vez.',
             ]);
     }
 
@@ -255,7 +340,7 @@ class PublicPortalController extends Controller
         $cpfDigits = preg_replace('/\D+/', '', $rawTerm) ?: '';
 
         $query = Inscricao::query()
-            ->with('edital:id,titulo,publicado')
+            ->with('edital:id,titulo,publicado,periodo_inscricao_inicio,periodo_inscricao_fim')
             ->whereHas('edital', fn ($q) => $q->where('publicado', true))
             ->where(function ($q) use ($rawTerm, $lowerTerm, $cpfDigits) {
                 $q->where('protocolo', $rawTerm)
@@ -270,18 +355,23 @@ class PublicPortalController extends Controller
             ->get();
 
         return $query->map(function (Inscricao $inscricao): array {
+            $canRequestEditLink = (bool) $inscricao->edital?->isAberto()
+                && $inscricao->status === Inscricao::STATUS_RECEBIDA;
+
             return [
                 'id' => $inscricao->id,
                 'protocolo' => $inscricao->protocolo,
                 'nome_completo' => $this->maskNome($inscricao->nome_completo),
                 'email' => $this->maskEmail($inscricao->email),
                 'cpf' => $this->maskCpf($inscricao->cpf),
+                'status_key' => $inscricao->status,
                 'status' => $this->statusPublico($inscricao->status),
                 'email_verificado' => $inscricao->email_verified_at !== null,
                 'resend_key' => hash_hmac('sha256', $inscricao->id.'|'.$inscricao->email, (string) config('app.key')),
                 'edital' => $inscricao->edital?->titulo ?? '-',
                 'submitted_at' => optional($inscricao->submitted_at)->format('d/m/Y H:i'),
                 'decided_at' => optional($inscricao->decided_at)->format('d/m/Y H:i'),
+                'can_request_edit_link' => $canRequestEditLink,
             ];
         })->values()->all();
     }

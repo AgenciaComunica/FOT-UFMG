@@ -16,8 +16,8 @@
     <p><strong>Edital:</strong> {{ $inscricao->edital?->titulo ?? '-' }}</p>
     <p><strong>E-mail:</strong> {{ $inscricao->email }}</p>
     <p><strong>CPF:</strong> {{ $inscricao->cpf }}</p>
+    <p><strong>Início desejado:</strong> {{ $inscricao->inicio_programa_semestre ? $inscricao->inicio_programa_semestre.'º semestre/'.$inscricao->inicio_programa_ano : '-' }}</p>
     <p><strong>Enviado em:</strong> {{ optional($inscricao->submitted_at)->format('d/m/Y H:i') ?? '-' }}</p>
     <p><strong>Decidido em:</strong> {{ optional($inscricao->decided_at)->format('d/m/Y H:i') ?? '-' }}</p>
 </body>
 </html>
-

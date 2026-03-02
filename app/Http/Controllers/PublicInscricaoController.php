@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Mail\InscricaoRecebidaMail;
 use App\Http\Requests\PublicStoreInscricaoRequest;
+use App\Http\Requests\PublicUpdateInscricaoRequest;
 use App\Models\Edital;
 use App\Models\Inscricao;
+use App\Models\InscricaoDocumento;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -43,6 +46,8 @@ class PublicInscricaoController extends Controller
                 'email' => $validated['email'],
                 'cpf' => $validated['cpf'],
                 'telefone' => $validated['telefone'] ?? null,
+                'inicio_programa_semestre' => (int) $validated['inicio_programa_semestre'],
+                'inicio_programa_ano' => (int) $validated['inicio_programa_ano'],
                 'email_verification_token' => hash('sha256', Str::uuid().'|'.$validated['email']),
                 'verification_sent_at' => now(),
                 'status' => Inscricao::STATUS_RECEBIDA,
@@ -84,12 +89,18 @@ class PublicInscricaoController extends Controller
             return $inscricao;
         });
 
-        $this->enviarEmailVerificacaoInscricao($inscricao);
+        $emailEnviado = $this->enviarEmailVerificacaoInscricao($inscricao);
 
-        return redirect()->route('public.inscricao.confirmacao', [
+        $redirect = redirect()->route('public.inscricao.confirmacao', [
             'edital' => $edital,
             'protocolo' => $inscricao->protocolo,
         ]);
+
+        if (! $emailEnviado) {
+            $redirect->with('status', 'Inscrição recebida, mas não foi possível enviar o e-mail de verificação agora. Tente reenviar em instantes.');
+        }
+
+        return $redirect;
     }
 
     public function confirmacao(Edital $edital, string $protocolo): View
@@ -152,12 +163,150 @@ class PublicInscricaoController extends Controller
             'verification_sent_at' => now(),
         ])->save();
 
-        $this->enviarEmailVerificacaoInscricao($inscricao);
+        $emailEnviado = $this->enviarEmailVerificacaoInscricao($inscricao);
+
+        if (! $emailEnviado) {
+            return back()->with('status', 'Não foi possível reenviar o link agora. Tente novamente em instantes.');
+        }
 
         return back()->with('status', 'Link de verificação reenviado com sucesso.');
     }
 
-    private function enviarEmailVerificacaoInscricao(Inscricao $inscricao): void
+    public function editWithToken(Inscricao $inscricao, string $token): View|RedirectResponse
+    {
+        $erro = $this->validarTokenEdicao($inscricao, $token);
+        if ($erro !== null) {
+            return redirect()
+                ->route('home', ['tab' => 'verificar'])
+                ->with('status', $erro);
+        }
+
+        $inscricao->loadMissing('edital.documentosRequeridos', 'documentos');
+
+        return view('public.inscricao.edit', [
+            'inscricao' => $inscricao,
+            'edital' => $inscricao->edital,
+            'editToken' => $token,
+            'maxPdfKb' => config('inscricoes.max_pdf_kb', 10_240),
+        ]);
+    }
+
+    public function updateWithToken(PublicUpdateInscricaoRequest $request, Inscricao $inscricao, string $token): RedirectResponse
+    {
+        $erro = $this->validarTokenEdicao($inscricao, $token);
+        if ($erro !== null) {
+            return redirect()
+                ->route('home', ['tab' => 'verificar'])
+                ->with('status', $erro);
+        }
+
+        $validated = $request->validated();
+        $inscricao->loadMissing('edital.documentosRequeridos', 'documentos');
+        $docsById = $inscricao->edital->documentosRequeridos->keyBy('id');
+
+        $emailAnterior = mb_strtolower(trim((string) $inscricao->email));
+        $emailNovo = mb_strtolower(trim((string) ($validated['email'] ?? '')));
+        $emailAlterado = $emailAnterior !== $emailNovo;
+
+        DB::transaction(function () use ($request, $validated, $inscricao, $docsById, $emailAlterado): void {
+            $tokenVerificacao = $emailAlterado
+                ? hash('sha256', Str::uuid().'|'.$validated['email'])
+                : $inscricao->email_verification_token;
+
+            $inscricao->forceFill([
+                'nome_completo' => $validated['nome_completo'],
+                'email' => $validated['email'],
+                'cpf' => $validated['cpf'],
+                'telefone' => $validated['telefone'] ?? null,
+                'inicio_programa_semestre' => (int) $validated['inicio_programa_semestre'],
+                'inicio_programa_ano' => (int) $validated['inicio_programa_ano'],
+                'status' => Inscricao::STATUS_RECEBIDA,
+                'decided_at' => null,
+                'decided_by' => null,
+                'indeferimento_motivo' => null,
+                'email_verified_at' => $emailAlterado ? null : $inscricao->email_verified_at,
+                'email_verification_token' => $tokenVerificacao,
+                'verification_sent_at' => $emailAlterado ? now() : $inscricao->verification_sent_at,
+                'edit_link_used_at' => now(),
+                'edit_link_token' => null,
+                'edit_link_expires_at' => null,
+            ])->save();
+
+            $inscricao->edicoes()->create([
+                'motivo' => trim((string) $validated['motivo_edicao']),
+                'edited_at' => now(),
+            ]);
+
+            $inscricao->avaliacoes()->update([
+                'nota' => null,
+                'avaliacao_subjetiva' => null,
+                'comentario' => null,
+                'avaliado_at' => null,
+                'updated_at' => now(),
+            ]);
+
+            foreach ($request->file('documentos', []) as $docId => $file) {
+                if (! $file) {
+                    continue;
+                }
+
+                $docConfig = $docsById->get((int) $docId);
+                if (! $docConfig) {
+                    continue;
+                }
+
+                $allowed = $docConfig->formatos_aceitos;
+                $defaultExt = $allowed[0] ?? 'pdf';
+                $extension = strtolower($file->getClientOriginalExtension() ?: $defaultExt);
+                if ($extension === 'jpeg') {
+                    $extension = 'jpg';
+                }
+
+                $safeTipo = Str::slug($docConfig->tipo, '_');
+                $fileName = 'doc_'.$docConfig->id.'_'.$safeTipo.'.'.$extension;
+                $directory = 'inscricoes/'.$inscricao->id;
+                $newPath = $directory.'/'.$fileName;
+
+                Storage::disk('local')->putFileAs($directory, $file, $fileName);
+
+                $existing = $inscricao->documentos->firstWhere('tipo', $docConfig->tipo);
+                if ($existing instanceof InscricaoDocumento) {
+                    if ($existing->arquivo_path !== $newPath && Storage::disk('local')->exists($existing->arquivo_path)) {
+                        Storage::disk('local')->delete($existing->arquivo_path);
+                    }
+
+                    $existing->forceFill([
+                        'arquivo_path' => $newPath,
+                        'original_name' => $file->getClientOriginalName(),
+                        'mime' => $file->getMimeType() ?? 'application/octet-stream',
+                        'size' => $file->getSize(),
+                        'uploaded_at' => now(),
+                    ])->save();
+
+                    continue;
+                }
+
+                $inscricao->documentos()->create([
+                    'tipo' => $docConfig->tipo,
+                    'arquivo_path' => $newPath,
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime' => $file->getMimeType() ?? 'application/octet-stream',
+                    'size' => $file->getSize(),
+                    'uploaded_at' => now(),
+                ]);
+            }
+        });
+
+        if ($emailAlterado) {
+            $this->enviarEmailVerificacaoInscricao($inscricao->fresh(['edital']));
+        }
+
+        return redirect()
+            ->route('home', ['tab' => 'verificar'])
+            ->with('status', 'Inscrição atualizada com sucesso.');
+    }
+
+    private function enviarEmailVerificacaoInscricao(Inscricao $inscricao): bool
     {
         $inscricao->loadMissing('edital');
 
@@ -171,7 +320,51 @@ class PublicInscricaoController extends Controller
             Mail::to($inscricao->email)->send(
                 new InscricaoRecebidaMail($inscricao, $verificationUrl, $statusUrl)
             );
-        } catch (\Throwable) {
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Falha ao enviar e-mail de verificação da inscrição.', [
+                'inscricao_id' => $inscricao->id,
+                'protocolo' => $inscricao->protocolo,
+                'email' => $inscricao->email,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return false;
         }
+    }
+
+    private function validarTokenEdicao(Inscricao $inscricao, string $token): ?string
+    {
+        $inscricao->loadMissing('edital');
+
+        if (! $inscricao->edital?->publicado) {
+            return 'Inscrição não disponível para edição.';
+        }
+
+        if (! $inscricao->edital?->isAberto()) {
+            return 'O prazo do edital foi encerrado. Edição indisponível.';
+        }
+
+        if ($inscricao->status !== Inscricao::STATUS_RECEBIDA) {
+            return 'A edição está disponível apenas para inscrições em análise.';
+        }
+
+        if (! filled($inscricao->edit_link_token)) {
+            return 'Link de edição inválido.';
+        }
+
+        if (! hash_equals((string) $inscricao->edit_link_token, hash('sha256', $token))) {
+            return 'Link de edição inválido.';
+        }
+
+        if ($inscricao->edit_link_used_at !== null) {
+            return 'Este link de edição já foi utilizado.';
+        }
+
+        if ($inscricao->edit_link_expires_at === null || now()->gt($inscricao->edit_link_expires_at)) {
+            return 'Este link de edição expirou. Solicite um novo link.';
+        }
+
+        return null;
     }
 }

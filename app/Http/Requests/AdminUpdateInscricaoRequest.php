@@ -25,6 +25,8 @@ class AdminUpdateInscricaoRequest extends FormRequest
             'email' => ['required', 'email', 'max:255', Rule::unique('inscricoes', 'email')->ignore($ignoreId)],
             'cpf' => ['required', 'string', 'max:20', Rule::unique('inscricoes', 'cpf')->ignore($ignoreId)],
             'telefone' => ['nullable', 'string', 'max:30'],
+            'inicio_programa_semestre' => ['required', 'integer', 'in:1,2'],
+            'inicio_programa_ano' => ['required', 'integer', 'min:'.now()->year, 'max:'.(now()->year + 10)],
         ];
     }
 
@@ -33,6 +35,8 @@ class AdminUpdateInscricaoRequest extends FormRequest
         return [
             'email.unique' => 'Este e-mail já está em uso em outra inscrição.',
             'cpf.unique' => 'Este CPF já está em uso em outra inscrição.',
+            'inicio_programa_semestre.required' => 'Selecione o semestre desejado para início.',
+            'inicio_programa_ano.required' => 'Selecione o ano desejado para início.',
         ];
     }
 

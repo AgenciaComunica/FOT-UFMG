@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Inscricao extends Model
@@ -27,10 +28,16 @@ class Inscricao extends Model
         'email',
         'cpf',
         'telefone',
+        'inicio_programa_semestre',
+        'inicio_programa_ano',
         'email_verification_token',
         'verification_sent_at',
         'email_verified_at',
         'resultado_email_sent_at',
+        'edit_link_token',
+        'edit_link_sent_at',
+        'edit_link_expires_at',
+        'edit_link_used_at',
         'status',
         'submitted_at',
         'decided_at',
@@ -46,6 +53,11 @@ class Inscricao extends Model
             'verification_sent_at' => 'datetime',
             'email_verified_at' => 'datetime',
             'resultado_email_sent_at' => 'datetime',
+            'edit_link_sent_at' => 'datetime',
+            'edit_link_expires_at' => 'datetime',
+            'edit_link_used_at' => 'datetime',
+            'inicio_programa_semestre' => 'integer',
+            'inicio_programa_ano' => 'integer',
         ];
     }
 
@@ -77,6 +89,16 @@ class Inscricao extends Model
     public function avaliacoes(): HasMany
     {
         return $this->hasMany(InscricaoAvaliacao::class);
+    }
+
+    public function edicoes(): HasMany
+    {
+        return $this->hasMany(InscricaoEdicao::class);
+    }
+
+    public function ultimaEdicao(): HasOne
+    {
+        return $this->hasOne(InscricaoEdicao::class)->latestOfMany('edited_at');
     }
 
     public function possuiDocumentosObrigatorios(): bool
