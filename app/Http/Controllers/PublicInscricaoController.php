@@ -148,7 +148,21 @@ class PublicInscricaoController extends Controller
 
     public function reenviarVerificacao(Request $request, Inscricao $inscricao): RedirectResponse
     {
-        $key = (string) $request->input('resend_key');
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:160'],
+            'resend_key' => ['required', 'string'],
+        ], [
+            'email.required' => 'Informe o e-mail cadastrado para confirmar o reenvio.',
+            'email.email' => 'Informe um e-mail válido.',
+        ]);
+
+        $emailInformado = mb_strtolower(trim((string) $validated['email']));
+        $emailInscricao = mb_strtolower(trim((string) $inscricao->email));
+        if ($emailInformado !== $emailInscricao) {
+            return back()->with('status', 'O e-mail informado não confere com a inscrição. Se houver erro de cadastro, contate a secretaria.');
+        }
+
+        $key = (string) $validated['resend_key'];
         $expected = hash_hmac('sha256', $inscricao->id.'|'.$inscricao->email, (string) config('app.key'));
         if (! hash_equals($expected, $key)) {
             abort(403);

@@ -226,7 +226,7 @@
                             @else
                                 <div class="space-y-3">
                                     @foreach ($consultaResultados as $item)
-                                        <article class="rounded-lg border border-slate-200 p-4 text-sm">
+                                        <article class="rounded-lg border border-slate-200 p-4 text-sm" x-data="{ openInfoModal: false, openEditModal: false, openResendModal: false }">
                                             <div class="grid gap-2 md:grid-cols-2">
                                                 <p><strong>Protocolo:</strong> {{ $item['protocolo'] ?? '-' }}</p>
                                                 <p><strong>Status:</strong> {{ $item['status'] ?? '-' }}</p>
@@ -246,29 +246,93 @@
                                                 <p><strong>Decidido em:</strong> {{ $item['decided_at'] ?? '-' }}</p>
                                             </div>
                                             <div class="mt-3 flex flex-wrap items-center gap-2">
-                                                <form method="POST" action="{{ route('public.inscricoes.enviar-informacoes', $item['id']) }}">
-                                                    @csrf
-                                                    <input type="hidden" name="consulta_termo" value="{{ $consultaTermo }}">
-                                                    <button type="submit" class="inline-flex items-center justify-center rounded-md border border-emerald-300 bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-200">
-                                                        Enviar informações completas por email
+                                                @if (empty($item['email_verificado']))
+                                                    <button type="button" @click="openResendModal = true" class="inline-flex items-center justify-center rounded-md border border-amber-300 bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-200">
+                                                        Reenviar verificação de e-mail
                                                     </button>
-                                                </form>
-                                                @if (!empty($item['can_request_edit_link']))
-                                                    <form method="POST" action="{{ route('public.inscricoes.enviar-link-edicao', $item['id']) }}">
-                                                        @csrf
-                                                        <input type="hidden" name="consulta_termo" value="{{ $consultaTermo }}">
-                                                        <button type="submit" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-                                                            Enviar link para edição de inscrição por email
-                                                        </button>
-                                                    </form>
                                                 @endif
-                                                <form method="POST" action="{{ route('public.inscricao.email.reenviar', $item['id']) }}">
-                                                        @csrf
-                                                        <input type="hidden" name="resend_key" value="{{ $item['resend_key'] ?? '' }}">
-                                                        <button type="submit" class="inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60" @disabled(!empty($item['email_verificado']))>
-                                                            Reenviar verificação de e-mail
-                                                        </button>
-                                                </form>
+                                                <button type="button" @click="openInfoModal = true" class="inline-flex items-center justify-center rounded-md border border-emerald-300 bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-200">
+                                                    Enviar informações completas por email
+                                                </button>
+                                                @if (!empty($item['can_request_edit_link']))
+                                                    <button type="button" @click="openEditModal = true" class="inline-flex items-center justify-center rounded-md border border-blue-300 bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-200">
+                                                        Enviar link para edição de inscrição por email
+                                                    </button>
+                                                @endif
+
+                                                <div
+                                                    x-show="openInfoModal"
+                                                    x-transition
+                                                    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4"
+                                                    style="display: none;"
+                                                >
+                                                    <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+                                                        <h4 class="text-base font-semibold text-slate-900">Confirmar e-mail</h4>
+                                                        <p class="mt-2 text-sm text-slate-600">Digite o e-mail cadastrado para enviar as informações completas.</p>
+                                                        <form method="POST" action="{{ route('public.inscricoes.enviar-informacoes', $item['id']) }}" class="mt-4 space-y-3">
+                                                            @csrf
+                                                            <input type="hidden" name="consulta_termo" value="{{ $consultaTermo }}">
+                                                            <div>
+                                                                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">E-mail cadastrado</label>
+                                                                <input type="email" name="email" class="input-base" placeholder="Digite seu e-mail" required>
+                                                            </div>
+                                                            <div class="flex justify-end gap-2">
+                                                                <button type="button" @click="openInfoModal = false" class="btn-muted">Cancelar</button>
+                                                                <button type="submit" class="inline-flex items-center justify-center rounded-md border border-emerald-300 bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-200">Enviar</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+
+                                                @if (!empty($item['can_request_edit_link']))
+                                                    <div
+                                                        x-show="openEditModal"
+                                                        x-transition
+                                                        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4"
+                                                        style="display: none;"
+                                                    >
+                                                        <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+                                                            <h4 class="text-base font-semibold text-slate-900">Confirmar e-mail</h4>
+                                                            <p class="mt-2 text-sm text-slate-600">Digite o e-mail cadastrado para receber o link de edição (24 horas e uso único).</p>
+                                                            <form method="POST" action="{{ route('public.inscricoes.enviar-link-edicao', $item['id']) }}" class="mt-4 space-y-3">
+                                                                @csrf
+                                                                <input type="hidden" name="consulta_termo" value="{{ $consultaTermo }}">
+                                                                <div>
+                                                                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">E-mail cadastrado</label>
+                                                                    <input type="email" name="email" class="input-base" placeholder="Digite seu e-mail" required>
+                                                                </div>
+                                                                <div class="flex justify-end gap-2">
+                                                                    <button type="button" @click="openEditModal = false" class="btn-muted">Cancelar</button>
+                                                                    <button type="submit" class="inline-flex items-center justify-center rounded-md border border-blue-300 bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-200">Enviar</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                @endif
+
+                                                <div
+                                                    x-show="openResendModal"
+                                                    x-transition
+                                                    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4"
+                                                    style="display: none;"
+                                                >
+                                                    <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+                                                        <h4 class="text-base font-semibold text-slate-900">Confirmar e-mail</h4>
+                                                        <p class="mt-2 text-sm text-slate-600">Digite o e-mail cadastrado para reenviar o link de verificação.</p>
+                                                        <form method="POST" action="{{ route('public.inscricao.email.reenviar', $item['id']) }}" class="mt-4 space-y-3">
+                                                            @csrf
+                                                            <input type="hidden" name="resend_key" value="{{ $item['resend_key'] ?? '' }}">
+                                                            <div>
+                                                                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">E-mail cadastrado</label>
+                                                                <input type="email" name="email" class="input-base" placeholder="Digite seu e-mail" required>
+                                                            </div>
+                                                            <div class="flex justify-end gap-2">
+                                                                <button type="button" @click="openResendModal = false" class="btn-muted">Cancelar</button>
+                                                                <button type="submit" class="inline-flex items-center justify-center rounded-md border border-amber-300 bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-200">Reenviar</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
                                             </div>
 
                                             @if (!empty($infoEmailError) && (int) $infoEmailTargetId === (int) ($item['id'] ?? 0))
