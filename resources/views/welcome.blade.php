@@ -229,7 +229,17 @@
                                         <article class="rounded-lg border border-slate-200 p-4 text-sm" x-data="{ openInfoModal: false, openEditModal: false, openResendModal: false }">
                                             <div class="grid gap-2 md:grid-cols-2">
                                                 <p><strong>Protocolo:</strong> {{ $item['protocolo'] ?? '-' }}</p>
-                                                <p><strong>Status:</strong> {{ $item['status'] ?? '-' }}</p>
+                                                <p>
+                                                    <strong>Status:</strong>
+                                                    @php
+                                                        $statusBadgeClass = match($item['status_key'] ?? null) {
+                                                            \App\Models\Inscricao::STATUS_HOMOLOGADA => 'status-homologada',
+                                                            \App\Models\Inscricao::STATUS_INDEFERIDA, \App\Models\Inscricao::STATUS_PRE_INDEFERIDA => 'status-indeferida',
+                                                            default => 'status-recebida',
+                                                        };
+                                                    @endphp
+                                                    <span class="status-badge {{ $statusBadgeClass }}">{{ $item['status'] ?? '-' }}</span>
+                                                </p>
                                                 <p>
                                                     <strong>E-mail verificado:</strong>
                                                     @if (!empty($item['email_verificado']))
