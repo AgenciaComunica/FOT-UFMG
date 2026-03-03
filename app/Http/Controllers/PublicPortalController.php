@@ -111,7 +111,11 @@ class PublicPortalController extends Controller
         abort_unless($inscricao->edital?->publicado, 404);
 
         $validated = $request->validate([
+            'email' => ['required', 'email', 'max:160'],
             'consulta_termo' => ['nullable', 'string', 'max:160'],
+        ], [
+            'email.required' => 'Informe o e-mail cadastrado para confirmar o envio.',
+            'email.email' => 'Informe um e-mail válido.',
         ]);
 
         $consultaTermo = trim((string) ($validated['consulta_termo'] ?? ''));
@@ -120,6 +124,19 @@ class PublicPortalController extends Controller
         }
 
         $resultados = $this->buildConsultaResultados($consultaTermo);
+        $emailInformado = mb_strtolower(trim((string) $validated['email']));
+        $emailInscricao = mb_strtolower(trim((string) $inscricao->email));
+
+        if ($emailInformado !== $emailInscricao) {
+            return redirect()
+                ->route('home', ['tab' => 'verificar'])
+                ->with([
+                    'consulta_resultados' => $resultados,
+                    'consulta_termo' => $consultaTermo,
+                    'info_email_error' => 'O e-mail informado não confere com a inscrição. Se houver erro de cadastro, contate a secretaria.',
+                    'info_email_target_id' => $inscricao->id,
+                ]);
+        }
 
         try {
             Mail::to($inscricao->email)->send(new InscricaoInformacoesCompletasMail($inscricao));
@@ -155,7 +172,11 @@ class PublicPortalController extends Controller
         abort_unless($inscricao->edital?->publicado, 404);
 
         $validated = $request->validate([
+            'email' => ['required', 'email', 'max:160'],
             'consulta_termo' => ['nullable', 'string', 'max:160'],
+        ], [
+            'email.required' => 'Informe o e-mail cadastrado para confirmar o envio.',
+            'email.email' => 'Informe um e-mail válido.',
         ]);
 
         $consultaTermo = trim((string) ($validated['consulta_termo'] ?? ''));
@@ -164,6 +185,19 @@ class PublicPortalController extends Controller
         }
 
         $resultados = $this->buildConsultaResultados($consultaTermo);
+        $emailInformado = mb_strtolower(trim((string) $validated['email']));
+        $emailInscricao = mb_strtolower(trim((string) $inscricao->email));
+
+        if ($emailInformado !== $emailInscricao) {
+            return redirect()
+                ->route('home', ['tab' => 'verificar'])
+                ->with([
+                    'consulta_resultados' => $resultados,
+                    'consulta_termo' => $consultaTermo,
+                    'edit_link_error' => 'O e-mail informado não confere com a inscrição. Se houver erro de cadastro, contate a secretaria.',
+                    'edit_link_target_id' => $inscricao->id,
+                ]);
+        }
 
         if (! $inscricao->edital?->isAberto() || $inscricao->status !== Inscricao::STATUS_RECEBIDA) {
             return redirect()
