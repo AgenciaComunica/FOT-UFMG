@@ -71,7 +71,7 @@
             </button>
         </div>
 
-        <div class="table-wrap" style="overflow-x: auto; overflow-y: visible;">
+        <div class="table-wrap">
             <table class="table-base">
                 <thead>
                     <tr>
