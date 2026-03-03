@@ -5,6 +5,9 @@
     <p><strong>Edital:</strong> {{ $inscricao->edital?->titulo }}</p>
     <p><strong>Protocolo:</strong> {{ $inscricao->protocolo }}</p>
     <p><strong>Status final:</strong> {{ $statusPublico }}</p>
+    @if (in_array($inscricao->status, [\App\Models\Inscricao::STATUS_INDEFERIDA, \App\Models\Inscricao::STATUS_PRE_INDEFERIDA], true) && filled($inscricao->indeferimento_motivo))
+        <p><strong>Motivo do indeferimento:</strong> {{ $inscricao->indeferimento_motivo }}</p>
+    @endif
 
     <p>Você pode acompanhar os dados na área pública:</p>
     <p>
@@ -14,4 +17,3 @@
     </p>
 </body>
 </html>
-
