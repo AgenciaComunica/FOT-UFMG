@@ -132,39 +132,22 @@
                             </td>
                             <td>{{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</td>
                             <td>
-                                <div class="relative inline-block text-left" style="position: relative;">
+                                <div class="flex items-center gap-2">
+                                    <a href="{{ route('admin.inscricoes.show', $inscricao) }}"
+                                       class="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
+                                        Ver
+                                    </a>
                                     <form method="POST" id="delete-inscricao-{{ $inscricao->id }}" action="{{ route('admin.inscricoes.destroy', $inscricao) }}" class="hidden">
                                         @csrf
                                         @method('DELETE')
                                     </form>
                                     <button
                                         type="button"
-                                        class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50"
-                                        @click="toggleDropdown({{ $inscricao->id }})"
-                                        :aria-expanded="dropdownOpenId === {{ $inscricao->id }}"
+                                        class="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                                        @click="singleDeleteFormId = 'delete-inscricao-{{ $inscricao->id }}'; singleDeleteLabel = '{{ $inscricao->protocolo }}'; confirmSingleDeleteOpen = true"
                                     >
-                                        <span class="sr-only">Ações</span>
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path d="M10 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" />
-                                        </svg>
+                                        Excluir
                                     </button>
-                                    <div
-                                        x-show="dropdownOpenId === {{ $inscricao->id }}"
-                                        @click.away="dropdownOpenId = null"
-                                        class="absolute right-0 mt-2 w-40 rounded-md border border-slate-200 bg-white p-1 shadow-lg"
-                                        style="display: none; position: absolute; right: 0; top: 100%; z-index: 9999;"
-                                    >
-                                        <a href="{{ route('admin.inscricoes.show', $inscricao) }}" class="flex w-full items-center rounded-md px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100" @click="dropdownOpenId = null">
-                                            Ver
-                                        </a>
-                                        <button
-                                            type="button"
-                                            class="flex w-full items-center rounded-md px-3 py-2 text-sm text-red-700 transition hover:bg-red-50"
-                                            @click="singleDeleteFormId = 'delete-inscricao-{{ $inscricao->id }}'; singleDeleteLabel = '{{ $inscricao->protocolo }}'; confirmSingleDeleteOpen = true; dropdownOpenId = null"
-                                        >
-                                            Excluir
-                                        </button>
-                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -306,7 +289,6 @@
                 confirmSingleDeleteOpen: false,
                 singleDeleteFormId: '',
                 singleDeleteLabel: '',
-                dropdownOpenId: null,
                 startDate: initialStart || '',
                 endDate: initialEnd || '',
                 toggleOne(id, checked) {
@@ -323,9 +305,6 @@
                         return;
                     }
                     this.selectedIds = [];
-                },
-                toggleDropdown(id) {
-                    this.dropdownOpenId = this.dropdownOpenId === id ? null : id;
                 },
                 submitSingleDelete() {
                     if (!this.singleDeleteFormId) return;
