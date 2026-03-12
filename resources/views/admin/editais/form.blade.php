@@ -171,8 +171,13 @@
                                     <select :name="`banca_docentes[${index}][user_id]`" x-model="bancaDocentes[index].user_id" @change="handleDocenteSelection(index)" class="input-base mt-1">
                                         <option value="">Selecione</option>
                                         <option value="__new_docente__">+ Novo Docente</option>
-                                        <template x-for="docente in availableDocentes(index)" :key="`opt-${index}-${docente.id}`">
-                                            <option :value="String(docente.id)" x-text="`${docente.name} (${docente.email})${docente.ativo ? '' : ' - Inativo'}`"></option>
+                                        <template x-for="docente in docentesDisponiveis" :key="`opt-${index}-${docente.id}`">
+                                            <option
+                                                :value="String(docente.id)"
+                                                :selected="String(bancaDocentes[index].user_id ?? '') === String(docente.id)"
+                                                :disabled="isDocenteDisabled(index, docente.id)"
+                                                x-text="`${docente.name} (${docente.email})${docente.ativo ? '' : ' - Inativo'}`"
+                                            ></option>
                                         </template>
                                     </select>
                                 </div>
@@ -440,6 +445,14 @@
                 availableDocentes(index) {
                     const selected = this.selectedDocentes(index);
                     return this.docentesDisponiveis.filter((docente) => !selected.includes(String(docente.id)));
+                },
+                isDocenteDisabled(index, docenteId) {
+                    const selectedId = String(this.bancaDocentes[index]?.user_id ?? '').trim();
+                    if (selectedId === String(docenteId)) {
+                        return false;
+                    }
+
+                    return this.selectedDocentes(index).includes(String(docenteId));
                 },
                 sortearDocente(index) {
                     const pool = this.availableDocentes(index);

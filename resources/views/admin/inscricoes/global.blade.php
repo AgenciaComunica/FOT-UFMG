@@ -257,19 +257,19 @@
                 @endif
             </div>
         </div>
-    </div>
 
-    <div x-show="confirmSingleDeleteOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="confirmSingleDeleteOpen=false">
-        <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
-            <h3 class="text-lg font-bold text-slate-900">Confirmar exclusão</h3>
-            <p class="mt-2 text-sm text-slate-600">
-                Deseja realmente excluir a inscrição
-                <span class="font-semibold text-slate-800" x-text="singleDeleteLabel"></span>?
-            </p>
-            <p class="mt-1 text-xs text-red-600">Esta ação é irreversível.</p>
-            <div class="mt-4 flex justify-end gap-2">
-                <button type="button" class="btn-muted" @click="confirmSingleDeleteOpen=false">Cancelar</button>
-                <button type="button" class="btn-danger" @click="submitSingleDelete()">Excluir</button>
+        <div x-show="confirmSingleDeleteOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="confirmSingleDeleteOpen=false">
+            <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+                <h3 class="text-lg font-bold text-slate-900">Confirmar exclusão</h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    Deseja realmente excluir a inscrição
+                    <span class="font-semibold text-slate-800" x-text="singleDeleteLabel"></span>?
+                </p>
+                <p class="mt-1 text-xs text-red-600">Esta ação é irreversível.</p>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button type="button" class="btn-muted" @click="confirmSingleDeleteOpen=false">Cancelar</button>
+                    <button type="button" class="btn-danger" @click="submitSingleDelete()">Excluir</button>
+                </div>
             </div>
         </div>
     </div>
