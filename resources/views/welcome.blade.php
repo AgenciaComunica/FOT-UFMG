@@ -407,7 +407,7 @@
                     >
                         ✕
                     </button>
-                    <iframe :src="newsletterIframeUrl" class="h-[520px] w-full border-0 bg-transparent"></iframe>
+                    <iframe :src="newsletterIframeUrl" class="w-full border-0 bg-transparent" style="height: 520px;"></iframe>
                 </div>
             </div>
         </main>
