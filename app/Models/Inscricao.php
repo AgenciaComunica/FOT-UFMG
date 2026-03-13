@@ -20,6 +20,38 @@ class Inscricao extends Model
     public const STATUS_HOMOLOGADA = 'HOMOLOGADA';
     public const STATUS_INDEFERIDA = 'INDEFERIDA';
 
+    public static function statusLabel(string $status): string
+    {
+        return match ($status) {
+            self::STATUS_HOMOLOGADA => 'Homologada',
+            self::STATUS_PRE_APROVADA => 'Classificada',
+            self::STATUS_PRE_INDEFERIDA => 'Excedente',
+            self::STATUS_INDEFERIDA => 'Não homologada',
+            default => 'Em homologação',
+        };
+    }
+
+    public static function statusBadgeClass(string $status): string
+    {
+        return match ($status) {
+            self::STATUS_HOMOLOGADA => 'status-homologada',
+            self::STATUS_PRE_APROVADA => 'bg-cyan-100 text-cyan-700',
+            self::STATUS_PRE_INDEFERIDA => 'bg-orange-100 text-orange-700',
+            self::STATUS_INDEFERIDA => 'status-indeferida',
+            default => 'status-recebida',
+        };
+    }
+
+    public function permiteEdicaoPublica(): bool
+    {
+        return in_array($this->status, [self::STATUS_RECEBIDA, self::STATUS_INDEFERIDA], true);
+    }
+
+    public function estaHomologada(): bool
+    {
+        return in_array($this->status, [self::STATUS_HOMOLOGADA, self::STATUS_PRE_APROVADA, self::STATUS_PRE_INDEFERIDA], true);
+    }
+
     protected $fillable = [
         'edital_id',
         'user_id',

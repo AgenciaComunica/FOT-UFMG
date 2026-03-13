@@ -25,6 +25,7 @@ class AdminUpdateInscricaoRequest extends FormRequest
             'email' => ['required', 'email', 'max:255', Rule::unique('inscricoes', 'email')->ignore($ignoreId)],
             'cpf' => ['required', 'string', 'max:20', Rule::unique('inscricoes', 'cpf')->ignore($ignoreId)],
             'telefone' => ['nullable', 'string', 'max:30'],
+            'email_confirmado' => ['nullable', 'boolean'],
             'inicio_programa_semestre' => ['required', 'integer', 'in:1,2'],
             'inicio_programa_ano' => ['required', 'integer', 'min:'.now()->year, 'max:'.(now()->year + 10)],
         ];

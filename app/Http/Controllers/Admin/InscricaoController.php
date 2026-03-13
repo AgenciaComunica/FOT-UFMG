@@ -7,21 +7,19 @@ use App\Http\Requests\AdminHomologarInscricaoRequest;
 use App\Http\Requests\AdminIndeferirInscricaoRequest;
 use App\Http\Requests\AdminUpdateInscricaoRequest;
 use App\Mail\InscricaoRecebidaMail;
-use App\Mail\InscricaoResultadoMail;
 use App\Models\Edital;
 use App\Models\Inscricao;
 use App\Models\InscricaoAvaliacao;
 use App\Models\InscricaoDocumento;
 use App\Models\User;
 use App\Services\InscricaoPreClassificacaoService;
+use App\Services\InscricaoWorkflowService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -30,7 +28,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InscricaoController extends Controller
 {
-    public function __construct(private readonly InscricaoPreClassificacaoService $preClassificacaoService)
+    public function __construct(
+        private readonly InscricaoPreClassificacaoService $preClassificacaoService,
+        private readonly InscricaoWorkflowService $workflowService,
+    )
     {
     }
 
@@ -240,6 +241,17 @@ class InscricaoController extends Controller
 
         $emailAlterado = mb_strtolower($inscricao->email) !== mb_strtolower($data['email']);
         $cpfAlterado = preg_replace('/\D+/', '', (string) $inscricao->cpf) !== preg_replace('/\D+/', '', (string) $data['cpf']);
+        $emailConfirmadoManual = $request->boolean('email_confirmado');
+
+        $emailVerifiedAt = $emailConfirmadoManual
+            ? now()
+            : ($emailAlterado ? null : $inscricao->email_verified_at);
+        $emailVerificationToken = $emailConfirmadoManual
+            ? null
+            : ($emailAlterado ? hash('sha256', Str::uuid().'|'.$data['email']) : $inscricao->email_verification_token);
+        $verificationSentAt = $emailConfirmadoManual
+            ? now()
+            : ($emailAlterado ? null : $inscricao->verification_sent_at);
 
         $inscricao->update([
             'nome_completo' => $data['nome_completo'],
@@ -248,9 +260,9 @@ class InscricaoController extends Controller
             'telefone' => $data['telefone'] ?? null,
             'inicio_programa_semestre' => (int) $data['inicio_programa_semestre'],
             'inicio_programa_ano' => (int) $data['inicio_programa_ano'],
-            'email_verified_at' => $emailAlterado ? null : $inscricao->email_verified_at,
-            'email_verification_token' => $emailAlterado ? hash('sha256', Str::uuid().'|'.$data['email']) : $inscricao->email_verification_token,
-            'verification_sent_at' => $emailAlterado ? null : $inscricao->verification_sent_at,
+            'email_verified_at' => $emailVerifiedAt,
+            'email_verification_token' => $emailVerificationToken,
+            'verification_sent_at' => $verificationSentAt,
         ]);
 
         if ($cpfAlterado || $emailAlterado) {
@@ -259,7 +271,7 @@ class InscricaoController extends Controller
             ])->save();
         }
 
-        if ($emailAlterado) {
+        if ($emailAlterado && ! $emailConfirmadoManual) {
             $this->enviarVerificacaoInscricao($inscricao->fresh(['edital']));
         }
 
@@ -329,6 +341,63 @@ class InscricaoController extends Controller
         return redirect()
             ->route('admin.inscricoes.show', ['inscricao' => $inscricao, 'tab' => 'documentos'])
             ->with('status', 'Documento substituído com sucesso.');
+    }
+
+    public function storeDocumento(Request $request, Inscricao $inscricao): RedirectResponse
+    {
+        $this->authorize('view', $inscricao);
+
+        $maxKb = (int) config('inscricoes.max_pdf_kb', 10_240);
+        $validated = $request->validate([
+            'tipo' => ['required', 'string', 'max:120'],
+            'arquivo' => ['required', 'file', 'max:'.$maxKb],
+        ], [
+            'tipo.required' => 'Selecione o tipo do documento.',
+            'arquivo.required' => 'Selecione um arquivo para envio.',
+            'arquivo.file' => 'Arquivo inválido.',
+            'arquivo.max' => 'O arquivo excede o tamanho máximo permitido.',
+        ]);
+
+        $inscricao->loadMissing('edital.documentosRequeridos', 'documentos');
+
+        $tipo = trim((string) $validated['tipo']);
+        $file = $validated['arquivo'];
+        $extensao = strtolower((string) $file->getClientOriginalExtension());
+        if ($extensao === 'jpeg') {
+            $extensao = 'jpg';
+        }
+
+        $formatosAceitos = $this->formatosAceitosDocumento($inscricao, $tipo);
+        if (! in_array($extensao, $formatosAceitos, true)) {
+            throw ValidationException::withMessages([
+                'arquivo' => 'Formato inválido. Permitidos: '.strtoupper(implode(', ', $formatosAceitos)).'.',
+            ]);
+        }
+
+        $this->assertMimeDocumento($file->getMimeType(), $extensao);
+
+        $doc = InscricaoDocumento::create([
+            'inscricao_id' => $inscricao->id,
+            'tipo' => $tipo,
+            'arquivo_path' => '',
+            'original_name' => $file->getClientOriginalName(),
+            'mime' => $file->getMimeType() ?? 'application/octet-stream',
+            'size' => $file->getSize(),
+            'uploaded_at' => now(),
+        ]);
+
+        $safeTipo = Str::slug($tipo, '_');
+        $fileName = 'doc_'.$doc->id.'_'.$safeTipo.'.'.$extensao;
+        $directory = 'inscricoes/'.$inscricao->id;
+        Storage::disk('local')->putFileAs($directory, $file, $fileName);
+
+        $doc->update([
+            'arquivo_path' => $directory.'/'.$fileName,
+        ]);
+
+        return redirect()
+            ->route('admin.inscricoes.show', ['inscricao' => $inscricao, 'tab' => 'documentos'])
+            ->with('status', 'Documento enviado com sucesso.');
     }
 
     public function destroyDocumento(Inscricao $inscricao, InscricaoDocumento $doc): RedirectResponse
@@ -520,79 +589,28 @@ class InscricaoController extends Controller
 
     public function homologar(AdminHomologarInscricaoRequest $request, Inscricao $inscricao): RedirectResponse
     {
-        $flashPassword = null;
-        $flashMessage = null;
-
-        DB::transaction(function () use ($request, $inscricao, &$flashPassword, &$flashMessage): void {
+        $temporaryPassword = DB::transaction(function () use ($request, $inscricao) {
             $inscricao = Inscricao::query()
                 ->with(['edital.documentosRequeridos', 'documentos'])
                 ->lockForUpdate()
                 ->findOrFail($inscricao->id);
 
-            if (! in_array($inscricao->status, [Inscricao::STATUS_RECEBIDA, Inscricao::STATUS_PRE_APROVADA, Inscricao::STATUS_PRE_INDEFERIDA], true)) {
-                throw ValidationException::withMessages([
-                    'status' => 'Apenas inscrições recebidas podem ser homologadas.',
-                ]);
-            }
-
-            if (! $inscricao->possuiDocumentosObrigatorios()) {
-                throw ValidationException::withMessages([
-                    'documentos' => 'Não é possível homologar com documentos obrigatórios faltando.',
-                ]);
-            }
-            if (! $inscricao->isEmailVerified()) {
-                throw ValidationException::withMessages([
-                    'email' => 'Não é possível homologar sem e-mail verificado da inscrição.',
-                ]);
-            }
-
-            $user = User::query()->where('email', $inscricao->email)->first();
-
-            if ($user && $user->role !== User::ROLE_ALUNO) {
-                throw ValidationException::withMessages([
-                    'email' => 'Já existe usuário com esse e-mail e role diferente de aluno.',
-                ]);
-            }
-
-            if (! $user) {
-                $user = User::create([
-                    'name' => $inscricao->nome_completo,
-                    'email' => $inscricao->email,
-                    'password' => Str::password(20),
-                    'role' => User::ROLE_ALUNO,
-                    'email_verified_at' => now(),
-                ]);
-            }
-
-            $inscricao->update([
-                'status' => Inscricao::STATUS_HOMOLOGADA,
-                'decided_at' => now(),
-                'decided_by' => $request->user()->id,
-                'indeferimento_motivo' => null,
-                'user_id' => $user->id,
-            ]);
-
-            $this->enviarResultadoInscricao($inscricao);
-
-            $canUseResetFlow = config('mail.default') !== 'log';
-            if ($canUseResetFlow && Password::sendResetLink(['email' => $user->email]) === Password::RESET_LINK_SENT) {
-                $flashMessage = 'Inscrição homologada e link para definir senha enviado ao aluno.';
-
-                return;
-            }
-
-            $flashPassword = Str::password(14);
-            $user->forceFill([
-                'password' => $flashPassword,
-            ])->save();
-
-            $flashMessage = 'Inscrição homologada. E-mail não configurado: use a senha temporária para repasse manual.';
+            return $this->workflowService->applyStatus(
+                $inscricao,
+                Inscricao::STATUS_HOMOLOGADA,
+                $request->user()->id,
+            );
         });
 
-        return redirect()
+        $redirect = redirect()
             ->route('admin.inscricoes.show', $inscricao)
-            ->with('status', $flashMessage)
-            ->with('senha_temporaria', $flashPassword);
+            ->with('status', 'Inscrição homologada com sucesso. Agora ela está apta para classificação.');
+
+        if ($temporaryPassword) {
+            $redirect->with('senha_temporaria', $temporaryPassword);
+        }
+
+        return $redirect;
     }
 
     public function updateStatus(Request $request, Inscricao $inscricao): RedirectResponse
@@ -600,7 +618,7 @@ class InscricaoController extends Controller
         $this->authorize('view', $inscricao);
 
         $data = $request->validate([
-            'status' => ['required', 'in:RECEBIDA,HOMOLOGADA,INDEFERIDA'],
+            'status' => ['required', 'in:RECEBIDA,HOMOLOGADA,INDEFERIDA,PRE_APROVADA,PRE_INDEFERIDA'],
             'indeferimento_motivo' => ['nullable', 'string', 'max:4000'],
         ], [
             'status.required' => 'Selecione um status válido.',
@@ -609,17 +627,17 @@ class InscricaoController extends Controller
 
         if ($data['status'] === Inscricao::STATUS_INDEFERIDA && ! filled($data['indeferimento_motivo'] ?? null)) {
             throw ValidationException::withMessages([
-                'indeferimento_motivo' => 'O motivo é obrigatório para definir como indeferida.',
+                'indeferimento_motivo' => 'O motivo é obrigatório para definir como não homologada.',
             ]);
         }
 
-        DB::transaction(function () use ($request, $inscricao, $data): void {
+        $temporaryPassword = DB::transaction(function () use ($request, $inscricao, $data) {
             $inscricao = Inscricao::query()
                 ->with(['edital.documentosRequeridos', 'documentos'])
                 ->lockForUpdate()
                 ->findOrFail($inscricao->id);
 
-            $this->aplicarStatusFinal(
+            return $this->workflowService->applyStatus(
                 $inscricao,
                 $data['status'],
                 $request->user()->id,
@@ -627,15 +645,21 @@ class InscricaoController extends Controller
             );
         });
 
-        return redirect()
+        $redirect = redirect()
             ->route('admin.inscricoes.show', ['inscricao' => $inscricao, 'tab' => 'dados'])
             ->with('status', 'Status da inscrição atualizado com sucesso.');
+
+        if ($temporaryPassword) {
+            $redirect->with('senha_temporaria', $temporaryPassword);
+        }
+
+        return $redirect;
     }
 
     public function bulkUpdateStatus(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'status' => ['required', 'in:RECEBIDA,HOMOLOGADA,INDEFERIDA'],
+            'status' => ['required', 'in:RECEBIDA,HOMOLOGADA,INDEFERIDA,PRE_APROVADA,PRE_INDEFERIDA'],
             'indeferimento_motivo' => ['nullable', 'string', 'max:4000'],
             'selected_ids' => ['nullable', 'array'],
             'selected_ids.*' => ['integer', 'exists:inscricoes,id'],
@@ -643,7 +667,7 @@ class InscricaoController extends Controller
 
         if ($data['status'] === Inscricao::STATUS_INDEFERIDA && ! filled($data['indeferimento_motivo'] ?? null)) {
             throw ValidationException::withMessages([
-                'indeferimento_motivo' => 'O motivo é obrigatório para definir como indeferida.',
+                'indeferimento_motivo' => 'O motivo é obrigatório para definir como não homologada.',
             ]);
         }
 
@@ -658,22 +682,31 @@ class InscricaoController extends Controller
         $query->whereIn('id', $ids);
 
         $updated = 0;
+        $temporaryPasswords = [];
         $query->chunkById(100, function ($chunk) use (&$updated, $data, $request): void {
             foreach ($chunk as $inscricao) {
-                DB::transaction(function () use ($inscricao, $data, $request, &$updated): void {
+                DB::transaction(function () use ($inscricao, $data, $request, &$updated, &$temporaryPasswords): void {
                     $locked = Inscricao::query()->lockForUpdate()->findOrFail($inscricao->id);
-                    $this->aplicarStatusFinal(
+                    $temporaryPassword = $this->workflowService->applyStatus(
                         $locked,
                         $data['status'],
                         $request->user()->id,
                         $data['indeferimento_motivo'] ?? null
                     );
+                    if ($temporaryPassword) {
+                        $temporaryPasswords[] = $locked->email.': '.$temporaryPassword;
+                    }
                     $updated++;
                 });
             }
         });
 
-        return back()->with('status', "Ação em lote aplicada em {$updated} inscrição(ões).");
+        $redirect = back()->with('status', "Ação em lote aplicada em {$updated} inscrição(ões).");
+        if ($temporaryPasswords !== []) {
+            $redirect->with('senha_temporaria', implode(' | ', $temporaryPasswords));
+        }
+
+        return $redirect;
     }
 
     public function bulkDestroy(Request $request): RedirectResponse
@@ -705,24 +738,19 @@ class InscricaoController extends Controller
 
     public function indeferir(AdminIndeferirInscricaoRequest $request, Inscricao $inscricao): RedirectResponse
     {
-        if (! in_array($inscricao->status, [Inscricao::STATUS_RECEBIDA, Inscricao::STATUS_PRE_APROVADA, Inscricao::STATUS_PRE_INDEFERIDA], true)) {
-            throw ValidationException::withMessages([
-                'status' => 'Apenas inscrições recebidas podem ser indeferidas.',
-            ]);
-        }
-
-        $inscricao->update([
-            'status' => Inscricao::STATUS_INDEFERIDA,
-            'decided_at' => now(),
-            'decided_by' => $request->user()->id,
-            'indeferimento_motivo' => $request->validated('indeferimento_motivo'),
-        ]);
-
-        $this->enviarResultadoInscricao($inscricao);
+        DB::transaction(function () use ($request, $inscricao): void {
+            $locked = Inscricao::query()->lockForUpdate()->findOrFail($inscricao->id);
+            $this->workflowService->applyStatus(
+                $locked,
+                Inscricao::STATUS_INDEFERIDA,
+                $request->user()->id,
+                $request->validated('indeferimento_motivo'),
+            );
+        });
 
         return redirect()
             ->route('admin.inscricoes.show', $inscricao)
-            ->with('status', 'Inscrição indeferida com sucesso.');
+            ->with('status', 'Inscrição não homologada com sucesso.');
     }
 
     public function downloadDocumento(Inscricao $inscricao, InscricaoDocumento $doc)
@@ -789,94 +817,9 @@ class InscricaoController extends Controller
         ]);
     }
 
-    private function enviarResultadoInscricao(Inscricao $inscricao): void
-    {
-        if (! filled($inscricao->email)) {
-            return;
-        }
-
-        try {
-            Mail::to($inscricao->email)->send(
-                new InscricaoResultadoMail(
-                    $inscricao->fresh(['edital']),
-                    $this->statusPublico($inscricao->status),
-                    route('home', ['tab' => 'verificar'])
-                )
-            );
-        } catch (\Throwable) {
-        }
-
-        if (Schema::hasColumn('inscricoes', 'resultado_email_sent_at')) {
-            $inscricao->forceFill([
-                'resultado_email_sent_at' => now(),
-            ])->save();
-        }
-    }
-
     private function statusPublico(string $status): string
     {
-        return match ($status) {
-            Inscricao::STATUS_PRE_APROVADA => 'Pré-aprovado',
-            Inscricao::STATUS_PRE_INDEFERIDA => 'Pré-indeferido',
-            Inscricao::STATUS_HOMOLOGADA => 'Aprovado/Homologado',
-            Inscricao::STATUS_INDEFERIDA => 'Não aprovado/Indeferido',
-            default => 'Em análise',
-        };
-    }
-
-    private function aplicarStatusFinal(Inscricao $inscricao, string $status, int $userId, ?string $indeferimentoMotivo): void
-    {
-        if ($status === Inscricao::STATUS_HOMOLOGADA) {
-            $user = User::query()->where('email', $inscricao->email)->first();
-
-            if ($user && $user->role !== User::ROLE_ALUNO) {
-                throw ValidationException::withMessages([
-                    'status' => 'Já existe usuário com este e-mail e role diferente de aluno.',
-                ]);
-            }
-
-            if (! $user) {
-                $user = User::create([
-                    'name' => $inscricao->nome_completo,
-                    'email' => $inscricao->email,
-                    'password' => Str::password(20),
-                    'role' => User::ROLE_ALUNO,
-                    'email_verified_at' => now(),
-                ]);
-            }
-
-            $inscricao->forceFill([
-                'status' => Inscricao::STATUS_HOMOLOGADA,
-                'decided_at' => now(),
-                'decided_by' => $userId,
-                'indeferimento_motivo' => null,
-                'user_id' => $user->id,
-            ])->save();
-
-            $this->enviarResultadoInscricao($inscricao);
-
-            return;
-        }
-
-        if ($status === Inscricao::STATUS_INDEFERIDA) {
-            $inscricao->forceFill([
-                'status' => Inscricao::STATUS_INDEFERIDA,
-                'decided_at' => now(),
-                'decided_by' => $userId,
-                'indeferimento_motivo' => trim((string) $indeferimentoMotivo),
-            ])->save();
-
-            $this->enviarResultadoInscricao($inscricao);
-
-            return;
-        }
-
-        $inscricao->forceFill([
-            'status' => Inscricao::STATUS_RECEBIDA,
-            'decided_at' => null,
-            'decided_by' => null,
-            'indeferimento_motivo' => null,
-        ])->save();
+        return $this->workflowService->statusPublico($status);
     }
 
     private function enviarVerificacaoInscricao(Inscricao $inscricao): void

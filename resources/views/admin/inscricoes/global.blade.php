@@ -37,11 +37,11 @@
                 <x-input-label for="status" value="Status" />
                 <select id="status" name="status" class="input-base" @change="$refs.filterForm.submit()">
                     <option value="">Todos</option>
-                    <option value="RECEBIDA" @selected($status === 'RECEBIDA')>Em Análise</option>
-                    <option value="PRE_APROVADA" @selected($status === 'PRE_APROVADA')>Pré-Aprovado</option>
-                    <option value="PRE_INDEFERIDA" @selected($status === 'PRE_INDEFERIDA')>Pré-Indeferido</option>
+                    <option value="RECEBIDA" @selected($status === 'RECEBIDA')>Em Homologação</option>
                     <option value="HOMOLOGADA" @selected($status === 'HOMOLOGADA')>Homologada</option>
-                    <option value="INDEFERIDA" @selected($status === 'INDEFERIDA')>Indeferida</option>
+                    <option value="PRE_APROVADA" @selected($status === 'PRE_APROVADA')>Classificada</option>
+                    <option value="PRE_INDEFERIDA" @selected($status === 'PRE_INDEFERIDA')>Excedente</option>
+                    <option value="INDEFERIDA" @selected($status === 'INDEFERIDA')>Não homologada</option>
                 </select>
             </div>
             <div>
@@ -65,7 +65,7 @@
                 type="button"
                 class="inline-flex h-[42px] items-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
                 x-show="selectedIds.length > 0"
-                @click="bulkModalOpen = true; bulkAction = 'status'; bulkStatus = 'RECEBIDA'"
+                @click="bulkModalOpen = true; bulkAction = 'status'; bulkStatus = 'HOMOLOGADA'"
             >
                 Aplicar em vários
             </button>
@@ -92,20 +92,8 @@
                 <tbody>
                     @forelse ($inscricoes as $inscricao)
                         @php
-                            $statusClass = match($inscricao->status) {
-                                'HOMOLOGADA' => 'status-homologada',
-                                'INDEFERIDA' => 'status-indeferida',
-                                'PRE_APROVADA' => 'bg-cyan-100 text-cyan-700',
-                                'PRE_INDEFERIDA' => 'bg-orange-100 text-orange-700',
-                                default => 'status-recebida',
-                            };
-                            $statusLabel = match($inscricao->status) {
-                                'HOMOLOGADA' => 'Homologada',
-                                'INDEFERIDA' => 'Indeferida',
-                                'PRE_APROVADA' => 'Pré-Aprovado',
-                                'PRE_INDEFERIDA' => 'Pré-Indeferido',
-                                default => 'Em Análise',
-                            };
+                            $statusClass = \App\Models\Inscricao::statusBadgeClass($inscricao->status);
+                            $statusLabel = \App\Models\Inscricao::statusLabel($inscricao->status);
                         @endphp
                         <tr>
                             <td>
@@ -177,9 +165,11 @@
                         <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 md:col-span-2">
                             <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Controle de Inscrição</p>
                             <div class="flex items-center justify-center gap-2 py-1">
-                                <button type="button" class="btn-muted whitespace-nowrap" @click="bulkStatus='RECEBIDA'">Em Análise</button>
                                 <button type="button" class="btn-success whitespace-nowrap" @click="bulkStatus='HOMOLOGADA'">Homologar</button>
-                                <button type="button" class="btn-danger whitespace-nowrap" @click="bulkStatus='INDEFERIDA'">Indeferir</button>
+                                <button type="button" class="rounded-md bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700 whitespace-nowrap" @click="bulkStatus='PRE_APROVADA'">Classificar</button>
+                                <button type="button" class="rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 whitespace-nowrap" @click="bulkStatus='PRE_INDEFERIDA'">Excedente</button>
+                                <button type="button" class="btn-muted whitespace-nowrap" @click="bulkStatus='HOMOLOGADA'">Voltar à Análise</button>
+                                <button type="button" class="btn-danger whitespace-nowrap" @click="bulkStatus='INDEFERIDA'">Não homologar</button>
                             </div>
                         </div>
                         <div class="rounded-lg border border-red-200 bg-red-50 p-4 md:col-span-1">
@@ -190,8 +180,11 @@
                         </div>
                     </div>
                     <div x-show="bulkStatus === 'INDEFERIDA'">
-                        <x-input-label for="bulk_indeferimento_motivo" value="Motivo do indeferimento (obrigatório)" />
+                        <x-input-label for="bulk_indeferimento_motivo" value="Motivo da não homologação (obrigatório)" />
                         <textarea id="bulk_indeferimento_motivo" name="indeferimento_motivo" rows="3" class="input-base"></textarea>
+                    </div>
+                    <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+                        Ao confirmar, o sistema enviará e-mail aos candidatos selecionados.
                     </div>
                     <div class="flex justify-end gap-2 pt-2">
                         <button type="button" class="btn-muted" @click="bulkModalOpen=false">Cancelar</button>
@@ -285,7 +278,7 @@
                 selectedIds: [],
                 bulkModalOpen: false,
                 bulkAction: 'status',
-                bulkStatus: 'RECEBIDA',
+                bulkStatus: 'HOMOLOGADA',
                 confirmSingleDeleteOpen: false,
                 singleDeleteFormId: '',
                 singleDeleteLabel: '',

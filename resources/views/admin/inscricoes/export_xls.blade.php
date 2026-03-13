@@ -31,8 +31,10 @@
             <span><strong>Edital:</strong> {{ $edital?->titulo ?? 'Todos' }}</span>
             <span><strong>Status:</strong>
                 @if ($status === 'HOMOLOGADA') Homologada
-                @elseif($status === 'INDEFERIDA') Indeferida
-                @elseif($status === 'RECEBIDA') Em Análise
+                @elseif($status === 'INDEFERIDA') Não homologada
+                @elseif($status === 'PRE_APROVADA') Classificada
+                @elseif($status === 'PRE_INDEFERIDA') Excedente
+                @elseif($status === 'RECEBIDA') Em Homologação
                 @else Todos @endif
             </span>
             <span><strong>Período:</strong> {{ $dateStart && $dateEnd ? "$dateStart até $dateEnd" : 'Todos' }}</span>
@@ -64,8 +66,10 @@
                     <td>{{ $inscricao->edital?->titulo }}</td>
                     <td>
                         @if ($inscricao->status === 'HOMOLOGADA') Homologada
-                        @elseif($inscricao->status === 'INDEFERIDA') Indeferida
-                        @else Em Análise
+                        @elseif($inscricao->status === 'INDEFERIDA') Não homologada
+                        @elseif($inscricao->status === 'PRE_APROVADA') Classificada
+                        @elseif($inscricao->status === 'PRE_INDEFERIDA') Excedente
+                        @else Em Homologação
                         @endif
                     </td>
                     <td>{{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</td>

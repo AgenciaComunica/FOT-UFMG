@@ -17,6 +17,7 @@ class InscricaoResultadoMail extends Mailable
         public Inscricao $inscricao,
         public string $statusPublico,
         public string $statusUrl,
+        public ?string $editUrl = null,
     ) {
     }
 
@@ -34,4 +35,3 @@ class InscricaoResultadoMail extends Mailable
         );
     }
 }
-

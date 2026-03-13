@@ -71,6 +71,7 @@ Route::prefix('admin')
         Route::post('/inscricoes/{inscricao}/status', [AdminInscricaoController::class, 'updateStatus'])->name('inscricoes.status');
         Route::post('/inscricoes/status/lote', [AdminInscricaoController::class, 'bulkUpdateStatus'])->name('inscricoes.status.bulk');
         Route::post('/inscricoes/excluir/lote', [AdminInscricaoController::class, 'bulkDestroy'])->name('inscricoes.destroy.bulk');
+        Route::post('/inscricoes/{inscricao}/documentos', [AdminInscricaoController::class, 'storeDocumento'])->name('inscricoes.documentos.store');
         Route::put('/inscricoes/{inscricao}/documentos/{doc}', [AdminInscricaoController::class, 'updateDocumento'])->name('inscricoes.documentos.update');
         Route::delete('/inscricoes/{inscricao}/documentos/{doc}', [AdminInscricaoController::class, 'destroyDocumento'])->name('inscricoes.documentos.destroy');
         Route::post('/inscricoes/{inscricao}/homologar', [AdminInscricaoController::class, 'homologar'])->name('inscricoes.homologar');

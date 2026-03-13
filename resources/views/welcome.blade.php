@@ -23,7 +23,7 @@
 
         <main
             class="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8"
-            x-data="portalPublico(@js($tab), @js($consultaResultados), @js($consultaTermo), @js($dateStart), @js($dateEnd))"
+            x-data="portalPublico(@js($tab), @js($editalTab), @js($consultaResultados), @js($consultaTermo), @js($dateStart), @js($dateEnd))"
         >
 
             <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
@@ -63,6 +63,7 @@
                     <div class="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <form method="GET" class="space-y-4" x-ref="filterForm">
                             <input type="hidden" name="tab" value="editais">
+                            <input type="hidden" name="edital_tab" x-model="editalTab">
                             <input type="hidden" name="data_inicio" x-model="startDate">
                             <input type="hidden" name="data_fim" x-model="endDate">
 
@@ -102,9 +103,8 @@
                                         type="text"
                                         value="{{ $q }}"
                                         data-preserve-focus="1"
-                                        placeholder="Título ou descrição"
+                                        placeholder="Pesquise o edital pelo nome ou descrição"
                                         class="input-base"
-                                        @input="clearTimeout(timer); timer = setTimeout(() => $refs.filterForm.submit(), 350)"
                                     >
                                 </div>
                                 <div>
@@ -112,8 +112,9 @@
                                     <input type="text" x-ref="range" class="input-base" readonly>
                                 </div>
                                 <div class="flex gap-2">
+                                    <button type="submit" class="btn-primary">Pesquisar</button>
                                     @if ($filtroAlterado)
-                                        <a href="{{ route('home', ['tab' => 'editais']) }}" class="btn-muted">Limpar</a>
+                                        <a :href="clearEditaisUrl()" href="{{ route('home', ['tab' => 'editais']) }}" class="btn-muted">Limpar</a>
                                     @endif
                                 </div>
                             </div>
@@ -384,11 +385,10 @@
         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
         <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
         <script>
-            function portalPublico(initialTab, initialConsultaResultados, initialConsultaTermo, initialStart, initialEnd) {
+            function portalPublico(initialTab, initialEditalTab, initialConsultaResultados, initialConsultaTermo, initialStart, initialEnd) {
                 return {
                     mainTab: initialTab || 'editais',
-                    editalTab: 'abertos',
-                    timer: null,
+                    editalTab: initialEditalTab || 'abertos',
                     startDate: initialStart || '',
                     endDate: initialEnd || '',
                     consultaResultados: Array.isArray(initialConsultaResultados) ? initialConsultaResultados : [],
@@ -415,10 +415,17 @@
                                     this.startDate = instance.formatDate(selectedDates[0], 'Y-m-d');
                                     this.endDate = instance.formatDate(selectedDates[1], 'Y-m-d');
                                     instance.input.value = this.formatLabel(this.startDate, this.endDate);
-                                    this.$nextTick(() => this.$refs.filterForm.submit());
                                 }
                             },
                         });
+                    },
+                    clearEditaisUrl() {
+                        const params = new URLSearchParams({
+                            tab: 'editais',
+                            edital_tab: this.editalTab || 'abertos',
+                        });
+
+                        return `/?${params.toString()}`;
                     },
                     formatLabel(start, end) {
                         if (!start || !end) return 'Selecione um período';

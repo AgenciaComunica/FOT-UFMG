@@ -16,7 +16,7 @@ class InscricaoPreClassificacaoService
         $inscricoes = Inscricao::query()
             ->where('edital_id', $edital->id)
             ->whereIn('status', [
-                Inscricao::STATUS_RECEBIDA,
+                Inscricao::STATUS_HOMOLOGADA,
                 Inscricao::STATUS_PRE_APROVADA,
                 Inscricao::STATUS_PRE_INDEFERIDA,
             ])
@@ -25,7 +25,7 @@ class InscricaoPreClassificacaoService
 
         if ($totalBanca === 0 || $edital->criterio_nota_corte === Edital::CORTE_APROVACAO_MANUAL) {
             foreach ($inscricoes as $inscricao) {
-                $this->setStatus($inscricao, Inscricao::STATUS_RECEBIDA);
+                $this->setStatus($inscricao, Inscricao::STATUS_HOMOLOGADA);
             }
             return;
         }
@@ -50,7 +50,7 @@ class InscricaoPreClassificacaoService
             ->values();
 
         foreach ($completas->where('completa', false) as $item) {
-            $this->setStatus($item['inscricao'], Inscricao::STATUS_RECEBIDA);
+            $this->setStatus($item['inscricao'], Inscricao::STATUS_HOMOLOGADA);
         }
 
         $completasOnly = $completas->where('completa', true)->values();

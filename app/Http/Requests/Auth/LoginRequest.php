@@ -51,10 +51,12 @@ class LoginRequest extends FormRequest
         }
 
         $user = Auth::user();
-        if ($user && $user->role === User::ROLE_DOCENTE && ! $user->ativo) {
+        if ($user && in_array($user->role, [User::ROLE_DOCENTE, User::ROLE_ALUNO], true) && ! $user->ativo) {
             Auth::logout();
             throw ValidationException::withMessages([
-                'email' => 'Docente inativo. Solicite ativação para a secretaria.',
+                'email' => $user->role === User::ROLE_DOCENTE
+                    ? 'Docente inativo. Solicite ativação para a secretaria.'
+                    : 'Aluno sem acesso ativo no momento. Solicite verificação para a secretaria.',
             ]);
         }
 

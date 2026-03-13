@@ -21,11 +21,11 @@
                 <x-input-label for="status" value="Status" />
                 <select id="status" name="status" class="input-base">
                     <option value="">Todos</option>
-                    <option value="RECEBIDA" @selected($status === 'RECEBIDA')>Em Análise</option>
-                    <option value="PRE_APROVADA" @selected($status === 'PRE_APROVADA')>Pré-Aprovado</option>
-                    <option value="PRE_INDEFERIDA" @selected($status === 'PRE_INDEFERIDA')>Pré-Indeferido</option>
+                    <option value="RECEBIDA" @selected($status === 'RECEBIDA')>Em Homologação</option>
                     <option value="HOMOLOGADA" @selected($status === 'HOMOLOGADA')>Homologada</option>
-                    <option value="INDEFERIDA" @selected($status === 'INDEFERIDA')>Indeferida</option>
+                    <option value="PRE_APROVADA" @selected($status === 'PRE_APROVADA')>Classificada</option>
+                    <option value="PRE_INDEFERIDA" @selected($status === 'PRE_INDEFERIDA')>Excedente</option>
+                    <option value="INDEFERIDA" @selected($status === 'INDEFERIDA')>Não homologada</option>
                 </select>
             </div>
             <div>
@@ -57,20 +57,8 @@
                 <tbody>
                     @forelse ($inscricoes as $inscricao)
                         @php
-                            $statusClass = match($inscricao->status) {
-                                'HOMOLOGADA' => 'status-homologada',
-                                'INDEFERIDA' => 'status-indeferida',
-                                'PRE_APROVADA' => 'bg-cyan-100 text-cyan-700',
-                                'PRE_INDEFERIDA' => 'bg-orange-100 text-orange-700',
-                                default => 'status-recebida',
-                            };
-                            $statusLabel = match($inscricao->status) {
-                                'HOMOLOGADA' => 'Homologada',
-                                'INDEFERIDA' => 'Indeferida',
-                                'PRE_APROVADA' => 'Pré-Aprovado',
-                                'PRE_INDEFERIDA' => 'Pré-Indeferido',
-                                default => 'Em Análise',
-                            };
+                            $statusClass = \App\Models\Inscricao::statusBadgeClass($inscricao->status);
+                            $statusLabel = \App\Models\Inscricao::statusLabel($inscricao->status);
                         @endphp
                         <tr>
                             <td class="font-semibold">

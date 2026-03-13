@@ -8,6 +8,14 @@
     @if (in_array($inscricao->status, [\App\Models\Inscricao::STATUS_INDEFERIDA, \App\Models\Inscricao::STATUS_PRE_INDEFERIDA], true) && filled($inscricao->indeferimento_motivo))
         <p><strong>Motivo do indeferimento:</strong> {{ $inscricao->indeferimento_motivo }}</p>
     @endif
+    @if ($editUrl)
+        <p>Enquanto o prazo do edital estiver aberto, você pode corrigir a inscrição e reenviar os dados:</p>
+        <p>
+            <a href="{{ $editUrl }}" style="display:inline-block;padding:10px 14px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px;">
+                Editar inscrição
+            </a>
+        </p>
+    @endif
 
     <p>Você pode acompanhar os dados na área pública:</p>
     <p>

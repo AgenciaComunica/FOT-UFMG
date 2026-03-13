@@ -359,8 +359,8 @@ class PublicInscricaoController extends Controller
             return 'O prazo do edital foi encerrado. Edição indisponível.';
         }
 
-        if ($inscricao->status !== Inscricao::STATUS_RECEBIDA) {
-            return 'A edição está disponível apenas para inscrições em análise.';
+        if (! $inscricao->permiteEdicaoPublica()) {
+            return 'A edição está disponível apenas para inscrições em homologação ou não homologadas.';
         }
 
         if (! filled($inscricao->edit_link_token)) {
