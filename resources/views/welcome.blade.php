@@ -23,7 +23,7 @@
 
         <main
             class="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8"
-            x-data="portalPublico(@js($tab), @js($editalTab), @js($consultaResultados), @js($consultaTermo), @js($dateStart), @js($dateEnd))"
+            x-data="portalPublico(@js($tab), @js($editalTab), @js($consultaResultados), @js($consultaTermo), @js($dateStart), @js($dateEnd), @js($temEditalAberto), @js($newsletterIframeUrl))"
         >
 
             <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
@@ -38,6 +38,7 @@
                         <h1 class="text-2xl font-extrabold text-slate-900">Editais</h1>
                         <p class="mt-1 text-sm text-slate-600">Consulta de editais e verificação de inscrição.</p>
                     </div>
+                    <button type="button" class="btn-muted" @click="newsletterOpen = true">Assine nossa newsletter</button>
                 </div>
 
                 <div class="mb-5 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
@@ -379,21 +380,55 @@
                     @endif
                 </div>
             </section>
+
+            <div
+                x-show="newsletterOpen"
+                x-transition
+                class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
+                style="display: none;"
+                @click.self="closeNewsletter()"
+            >
+                <div class="relative w-full max-w-2xl overflow-hidden rounded-3xl shadow-2xl">
+                    <button
+                        type="button"
+                        class="absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-white/15 text-white backdrop-blur hover:bg-white/25"
+                        @click="closeNewsletter()"
+                    >
+                        ✕
+                    </button>
+                    <iframe :src="newsletterIframeUrl" class="h-[520px] w-full border-0 bg-transparent"></iframe>
+                </div>
+            </div>
         </main>
 
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
         <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
         <script>
-            function portalPublico(initialTab, initialEditalTab, initialConsultaResultados, initialConsultaTermo, initialStart, initialEnd) {
+            function portalPublico(initialTab, initialEditalTab, initialConsultaResultados, initialConsultaTermo, initialStart, initialEnd, hasOpenEdital, newsletterIframeUrl) {
                 return {
                     mainTab: initialTab || 'editais',
                     editalTab: initialEditalTab || 'abertos',
                     startDate: initialStart || '',
                     endDate: initialEnd || '',
+                    hasOpenEdital: !!hasOpenEdital,
+                    newsletterOpen: false,
+                    newsletterIframeUrl: newsletterIframeUrl || '',
                     consultaResultados: Array.isArray(initialConsultaResultados) ? initialConsultaResultados : [],
                     consultaTermo: initialConsultaTermo || '',
                     init() {
+                        const sessionKey = 'fot-newsletter-popup-opened';
+                        if (!this.hasOpenEdital && !window.sessionStorage.getItem(sessionKey)) {
+                            this.newsletterOpen = true;
+                            window.sessionStorage.setItem(sessionKey, '1');
+                        }
+
+                        window.addEventListener('message', (event) => {
+                            if (event?.data?.type === 'newsletter-close') {
+                                this.closeNewsletter();
+                            }
+                        });
+
                         if (typeof flatpickr === 'undefined') {
                             return;
                         }
@@ -418,6 +453,9 @@
                                 }
                             },
                         });
+                    },
+                    closeNewsletter() {
+                        this.newsletterOpen = false;
                     },
                     clearEditaisUrl() {
                         const params = new URLSearchParams({

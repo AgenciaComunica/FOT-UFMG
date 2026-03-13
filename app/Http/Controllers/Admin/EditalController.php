@@ -12,6 +12,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -65,6 +66,7 @@ class EditalController extends Controller
                 'documentosRequeridos:id,edital_id,tipo,ordem',
                 'docentesBanca:id,name',
             ])
+            ->withCount('inscricoes')
             ->when($q !== '', function ($builder) use ($q) {
                 $builder->where(function ($nested) use ($q) {
                     $nested
@@ -324,7 +326,7 @@ class EditalController extends Controller
 
     public function edit(Edital $edital): View
     {
-        $edital->load(['documentosRequeridos', 'docentesBanca']);
+        $edital->load(['documentosRequeridos', 'docentesBanca'])->loadCount('inscricoes');
 
         return view('admin.editais.form', [
             'edital' => $edital,
@@ -421,17 +423,52 @@ class EditalController extends Controller
 
     public function destroy(Edital $edital): RedirectResponse
     {
-        if ($edital->inscricoes()->exists()) {
-            return back()->withErrors([
-                'edital' => 'Não é possível excluir um edital que já possui inscrições.',
-            ]);
-        }
+        $inscricoesExcluidas = 0;
 
-        $edital->delete();
+        DB::transaction(function () use ($edital, &$inscricoesExcluidas): void {
+            $edital->loadMissing('inscricoes.documentos');
+            $inscricoesExcluidas = $edital->inscricoes->count();
+
+            foreach ($edital->inscricoes as $inscricao) {
+                foreach ($inscricao->documentos as $doc) {
+                    if (filled($doc->arquivo_path) && Storage::disk('local')->exists($doc->arquivo_path)) {
+                        Storage::disk('local')->delete($doc->arquivo_path);
+                    }
+                }
+
+                $directory = 'inscricoes/'.$inscricao->id;
+                if (Storage::disk('local')->exists($directory)) {
+                    Storage::disk('local')->deleteDirectory($directory);
+                }
+
+                $inscricao->documentos()->delete();
+                $inscricao->avaliacoes()->delete();
+                $inscricao->edicoes()->delete();
+                $inscricao->delete();
+            }
+
+            if ($edital->arquivo_path && Storage::disk('local')->exists($edital->arquivo_path)) {
+                Storage::disk('local')->delete($edital->arquivo_path);
+            }
+
+            $editalDirectory = 'editais/'.$edital->id;
+            if (Storage::disk('local')->exists($editalDirectory)) {
+                Storage::disk('local')->deleteDirectory($editalDirectory);
+            }
+
+            $edital->docentesBanca()->detach();
+            $edital->documentosRequeridos()->delete();
+            $edital->delete();
+        });
+
+        $mensagem = 'Edital excluído com sucesso.';
+        if ($inscricoesExcluidas > 0) {
+            $mensagem = 'Edital excluído com sucesso. '.$inscricoesExcluidas.' inscrição(ões) vinculada(s) também foram removidas.';
+        }
 
         return redirect()
             ->route('admin.editais.index')
-            ->with('status', 'Edital excluído com sucesso.');
+            ->with('status', $mensagem);
     }
 
     public function updatePublicacao(Request $request, Edital $edital): RedirectResponse

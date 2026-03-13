@@ -3,9 +3,11 @@
 use App\Http\Controllers\Admin\EditalController as AdminEditalController;
 use App\Http\Controllers\Admin\InscricaoController as AdminInscricaoController;
 use App\Http\Controllers\Admin\DocenteController as AdminDocenteController;
+use App\Http\Controllers\Admin\LeadController as AdminLeadController;
 use App\Http\Controllers\Aluno\PainelController;
 use App\Http\Controllers\DashboardRedirectController;
 use App\Http\Controllers\Docente\PainelController as DocentePainelController;
+use App\Http\Controllers\PublicLeadController;
 use App\Http\Controllers\PublicPortalController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicInscricaoController;
@@ -13,6 +15,10 @@ use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PublicPortalController::class, 'index'])->name('home');
+Route::get('/newsletter/iframe', [PublicLeadController::class, 'iframe'])->name('public.leads.iframe');
+Route::post('/newsletter', [PublicLeadController::class, 'store'])
+    ->middleware('throttle:8,60')
+    ->name('public.leads.store');
 Route::post('/inscricoes/verificar', [PublicPortalController::class, 'verificarInscricao'])
     ->middleware('throttle:8,1')
     ->name('public.inscricoes.verificar');
@@ -59,6 +65,10 @@ Route::prefix('admin')
         Route::get('/inscricoes/exportar.xls', [AdminInscricaoController::class, 'exportXls'])->name('inscricoes.export');
         Route::resource('editais', AdminEditalController::class, ['parameters' => ['editais' => 'edital']])->except(['show']);
         Route::resource('docentes', AdminDocenteController::class, ['parameters' => ['docentes' => 'docente']])->except(['show']);
+        Route::resource('leads', AdminLeadController::class, ['parameters' => ['leads' => 'lead']])->except(['show']);
+        Route::post('leads/disparo-manual', [AdminLeadController::class, 'sendManual'])->name('leads.send-manual');
+        Route::post('leads/importar', [AdminLeadController::class, 'import'])->name('leads.import');
+        Route::get('leads/modelo-importacao', [AdminLeadController::class, 'downloadTemplate'])->name('leads.template');
         Route::post('docentes/importar', [AdminDocenteController::class, 'import'])->name('docentes.import');
         Route::get('docentes/modelo-importacao', [AdminDocenteController::class, 'downloadTemplate'])->name('docentes.template');
         Route::post('docentes/{docente}/status', [AdminDocenteController::class, 'updateStatus'])->name('docentes.status');

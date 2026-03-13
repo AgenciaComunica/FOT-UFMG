@@ -81,6 +81,8 @@ class PublicPortalController extends Controller
             'filtroAlterado' => $q !== '' || (bool) $dateStart || (bool) $dateEnd,
             'consultaResultados' => $request->session()->pull('consulta_resultados', []),
             'consultaTermo' => $request->session()->pull('consulta_termo', ''),
+            'newsletterIframeUrl' => route('public.leads.iframe'),
+            'temEditalAberto' => $abertos->isNotEmpty(),
             'infoEmailError' => $request->session()->pull('info_email_error', ''),
             'infoEmailTargetId' => (int) $request->session()->pull('info_email_target_id', 0),
             'editLinkError' => $request->session()->pull('edit_link_error', ''),

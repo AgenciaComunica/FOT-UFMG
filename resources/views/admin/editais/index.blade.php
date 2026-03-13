@@ -230,7 +230,7 @@
                                     <button
                                         class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700 transition hover:bg-red-100"
                                         type="button"
-                                        @click="openDeleteModal({{ $edital->id }}, @js($edital->titulo))"
+                                        @click="openDeleteModal({{ $edital->id }}, @js($edital->titulo), {{ (int) $edital->inscricoes_count }})"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                             <path fill-rule="evenodd" d="M8.257 3.099c.366-.446.911-.699 1.486-.699h.514c.575 0 1.12.253 1.486.699L12.5 4H16a1 1 0 110 2h-.617l-.666 9.327A2 2 0 0112.722 17H7.278a2 2 0 01-1.995-1.673L4.617 6H4a1 1 0 010-2h3.5l.757-.901zM8 8a1 1 0 012 0v5a1 1 0 11-2 0V8zm4-1a1 1 0 10-2 0v6a1 1 0 102 0V7z" clip-rule="evenodd" />
@@ -290,6 +290,13 @@
             <div class="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
                 <h4 class="text-base font-semibold text-slate-900">Excluir edital</h4>
                 <p class="mt-2 text-sm text-slate-600">Digite o nome do edital para confirmar a exclusão:</p>
+                <p
+                    x-show="inscricoesCount > 0"
+                    x-transition
+                    class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                >
+                    Esta ação irá deletar todas as inscrições vinculadas a este edital.
+                </p>
                 <p class="mt-2 rounded-md bg-slate-100 px-2 py-1 text-sm font-semibold text-slate-800" x-text="expectedName"></p>
                 <div class="mt-3">
                     <input
@@ -365,17 +372,20 @@
                 open: false,
                 editalId: null,
                 expectedName: '',
+                inscricoesCount: 0,
                 typedName: '',
-                openDeleteModal(id, titulo) {
+                openDeleteModal(id, titulo, inscricoesCount = 0) {
                     this.open = true;
                     this.editalId = id;
                     this.expectedName = titulo ?? '';
+                    this.inscricoesCount = Number(inscricoesCount || 0);
                     this.typedName = '';
                 },
                 closeModal() {
                     this.open = false;
                     this.editalId = null;
                     this.expectedName = '';
+                    this.inscricoesCount = 0;
                     this.typedName = '';
                 },
                 confirmDelete() {
