@@ -9,7 +9,7 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ tab: 'dados', modalIndeferir: false }">
+    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ tab: 'dados', statusModal: { open: false, status: '', title: '', requiresReason: false }, openStatusModal(status, title, requiresReason = false) { this.statusModal = { open: true, status, title, requiresReason }; }, closeStatusModal() { this.statusModal = { open: false, status: '', title: '', requiresReason: false }; } }">
         @if (session('status'))
             <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{{ session('status') }}</div>
         @endif
@@ -77,20 +77,8 @@
                 <p><strong>Telefone:</strong> {{ $inscricao->telefone ?: '-' }}</p>
                 <p><strong>Status final:</strong>
                     @php
-                        $statusClass = match($inscricao->status) {
-                            'HOMOLOGADA' => 'status-homologada',
-                            'INDEFERIDA' => 'status-indeferida',
-                            'PRE_APROVADA' => 'bg-cyan-100 text-cyan-700',
-                            'PRE_INDEFERIDA' => 'bg-orange-100 text-orange-700',
-                            default => 'status-recebida',
-                        };
-                        $statusLabel = match($inscricao->status) {
-                            'HOMOLOGADA' => 'Homologada',
-                            'INDEFERIDA' => 'Indeferida',
-                            'PRE_APROVADA' => 'Pré-Aprovado',
-                            'PRE_INDEFERIDA' => 'Pré-Indeferido',
-                            default => 'Em Análise',
-                        };
+                        $statusClass = \App\Models\Inscricao::statusBadgeClass($inscricao->status);
+                        $statusLabel = \App\Models\Inscricao::statusLabel($inscricao->status);
                     @endphp
                     <span class="status-badge {{ $statusClass }}">{{ $statusLabel }}</span>
                 </p>
@@ -155,46 +143,40 @@
             <section class="panel-card">
                 <h4 class="text-sm font-semibold text-slate-800">Veredito final da inscrição</h4>
                 @php
-                    $isEmAnaliseDocente = in_array($inscricao->status, ['RECEBIDA', 'PRE_APROVADA', 'PRE_INDEFERIDA'], true);
-                    $isHomologadaDocente = $inscricao->status === 'HOMOLOGADA';
-                    $isIndeferidaDocente = $inscricao->status === 'INDEFERIDA';
+                    $emHomologacaoDocente = in_array($inscricao->status, ['RECEBIDA', 'INDEFERIDA'], true);
+                    $homologadaDocente = $inscricao->status === 'HOMOLOGADA';
+                    $finalizadaDocente = in_array($inscricao->status, ['PRE_APROVADA', 'PRE_INDEFERIDA'], true);
                 @endphp
                 <div class="mt-3 flex flex-wrap gap-2">
-                    @unless ($isEmAnaliseDocente)
-                        <form method="POST" action="{{ route('docente.inscricoes.status', $inscricao) }}">
-                            @csrf
-                            <input type="hidden" name="status" value="RECEBIDA">
-                            <button type="submit" class="btn-muted">Em Análise</button>
-                        </form>
-                    @endunless
-                    @unless ($isHomologadaDocente)
-                        <form method="POST" action="{{ route('docente.inscricoes.status', $inscricao) }}">
-                            @csrf
-                            <input type="hidden" name="status" value="HOMOLOGADA">
-                            <button type="submit" class="btn-success">Homologada</button>
-                        </form>
-                    @endunless
-                    @unless ($isIndeferidaDocente)
-                        <button type="button" class="btn-danger" @click="modalIndeferir = true">Indeferida</button>
-                    @endunless
+                    @if ($emHomologacaoDocente)
+                        <button type="button" class="btn-success" @click="openStatusModal('HOMOLOGADA', 'Homologar inscrição')">Homologar</button>
+                        <button type="button" class="btn-danger" @click="openStatusModal('INDEFERIDA', 'Não homologar inscrição', true)">Não homologar</button>
+                    @elseif ($homologadaDocente)
+                        <button type="button" class="rounded-md bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700" @click="openStatusModal('PRE_APROVADA', 'Classificar inscrição')">Classificar</button>
+                        <button type="button" class="rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600" @click="openStatusModal('PRE_INDEFERIDA', 'Colocar em excedente')">Colocar em Excedente</button>
+                        <button type="button" class="btn-danger" @click="openStatusModal('INDEFERIDA', 'Não homologar inscrição', true)">Não homologar</button>
+                    @elseif ($finalizadaDocente)
+                        <button type="button" class="btn-muted" @click="openStatusModal('HOMOLOGADA', 'Voltar à análise')">Voltar à Análise</button>
+                    @endif
                 </div>
             </section>
         @endif
 
         @if ($isAprovadorNoEdital)
-            <div x-show="modalIndeferir" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display: none;" @click.self="modalIndeferir = false">
+            <div x-show="statusModal.open" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display: none;" @click.self="closeStatusModal()">
                 <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-lg">
-                    <h3 class="text-lg font-bold text-slate-900">Definir como indeferida</h3>
+                    <h3 class="text-lg font-bold text-slate-900" x-text="statusModal.title"></h3>
                     <form method="POST" action="{{ route('docente.inscricoes.status', $inscricao) }}" class="mt-3 space-y-3">
                         @csrf
-                        <input type="hidden" name="status" value="INDEFERIDA">
-                        <div>
-                            <x-input-label for="indeferimento_motivo_docente" value="Motivo (obrigatório)" />
-                            <textarea id="indeferimento_motivo_docente" name="indeferimento_motivo" rows="4" class="input-base" required>{{ old('indeferimento_motivo', $inscricao->indeferimento_motivo) }}</textarea>
+                        <input type="hidden" name="status" :value="statusModal.status">
+                        <p class="text-sm text-slate-600">Confirme a ação. O sistema enviará e-mail ao candidato após a atualização.</p>
+                        <div x-show="statusModal.requiresReason">
+                            <x-input-label for="indeferimento_motivo_docente" value="Motivo da não homologação (obrigatório)" />
+                            <textarea id="indeferimento_motivo_docente" name="indeferimento_motivo" rows="4" class="input-base" :required="statusModal.requiresReason">{{ old('indeferimento_motivo', $inscricao->indeferimento_motivo) }}</textarea>
                         </div>
                         <div class="flex justify-end gap-2">
-                            <button type="button" class="btn-muted" @click="modalIndeferir = false">Cancelar</button>
-                            <button type="submit" class="btn-danger">Confirmar</button>
+                            <button type="button" class="btn-muted" @click="closeStatusModal()">Cancelar</button>
+                            <button type="submit" class="btn-primary">Confirmar ação</button>
                         </div>
                     </form>
                 </div>

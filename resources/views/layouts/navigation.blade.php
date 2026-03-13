@@ -13,6 +13,7 @@
                 @if (auth()->user()->role === \App\Models\User::ROLE_ADMIN)
                     <x-nav-link :href="route('admin.painel')" :active="request()->routeIs('admin.painel') || request()->routeIs('admin.editais.*')">Painel</x-nav-link>
                     <x-nav-link :href="route('admin.inscricoes.index')" :active="request()->routeIs('admin.inscricoes.*') || request()->routeIs('admin.editais.inscricoes.*')">Inscrições</x-nav-link>
+                    <x-nav-link :href="route('admin.leads.index')" :active="request()->routeIs('admin.leads.*')">Leads</x-nav-link>
                     <x-nav-link :href="route('admin.docentes.index')" :active="request()->routeIs('admin.docentes.*')">Docentes</x-nav-link>
                 @elseif (auth()->user()->role === \App\Models\User::ROLE_DOCENTE)
                     <x-nav-link :href="route('docente.inscricoes.index')" :active="request()->routeIs('docente.*')">Inscrições</x-nav-link>
@@ -55,6 +56,7 @@
             @if (auth()->user()->role === \App\Models\User::ROLE_ADMIN)
                 <x-responsive-nav-link :href="route('admin.painel')" :active="request()->routeIs('admin.painel') || request()->routeIs('admin.editais.*')">Painel</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.inscricoes.index')" :active="request()->routeIs('admin.inscricoes.*') || request()->routeIs('admin.editais.inscricoes.*')">Inscrições</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.leads.index')" :active="request()->routeIs('admin.leads.*')">Leads</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.docentes.index')" :active="request()->routeIs('admin.docentes.*')">Docentes</x-responsive-nav-link>
             @elseif (auth()->user()->role === \App\Models\User::ROLE_DOCENTE)
                 <x-responsive-nav-link :href="route('docente.inscricoes.index')" :active="request()->routeIs('docente.*')">Inscrições</x-responsive-nav-link>

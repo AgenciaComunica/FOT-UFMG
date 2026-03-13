@@ -21,11 +21,11 @@
                 <x-input-label for="status" value="Status" />
                 <select id="status" name="status" class="input-base">
                     <option value="">Todos</option>
-                    <option value="RECEBIDA" @selected($status === 'RECEBIDA')>Em Análise</option>
-                    <option value="PRE_APROVADA" @selected($status === 'PRE_APROVADA')>Pré-Aprovado</option>
-                    <option value="PRE_INDEFERIDA" @selected($status === 'PRE_INDEFERIDA')>Pré-Indeferido</option>
+                    <option value="RECEBIDA" @selected($status === 'RECEBIDA')>Em Homologação</option>
                     <option value="HOMOLOGADA" @selected($status === 'HOMOLOGADA')>Homologada</option>
-                    <option value="INDEFERIDA" @selected($status === 'INDEFERIDA')>Indeferida</option>
+                    <option value="PRE_APROVADA" @selected($status === 'PRE_APROVADA')>Classificada</option>
+                    <option value="PRE_INDEFERIDA" @selected($status === 'PRE_INDEFERIDA')>Excedente</option>
+                    <option value="INDEFERIDA" @selected($status === 'INDEFERIDA')>Não homologada</option>
                 </select>
             </div>
             <div>
@@ -57,20 +57,8 @@
                 <tbody>
                     @forelse ($inscricoes as $inscricao)
                         @php
-                            $statusClass = match($inscricao->status) {
-                                'HOMOLOGADA' => 'status-homologada',
-                                'INDEFERIDA' => 'status-indeferida',
-                                'PRE_APROVADA' => 'bg-cyan-100 text-cyan-700',
-                                'PRE_INDEFERIDA' => 'bg-orange-100 text-orange-700',
-                                default => 'status-recebida',
-                            };
-                            $statusLabel = match($inscricao->status) {
-                                'HOMOLOGADA' => 'Homologada',
-                                'INDEFERIDA' => 'Indeferida',
-                                'PRE_APROVADA' => 'Pré-Aprovado',
-                                'PRE_INDEFERIDA' => 'Pré-Indeferido',
-                                default => 'Em Análise',
-                            };
+                            $statusClass = \App\Models\Inscricao::statusBadgeClass($inscricao->status);
+                            $statusLabel = \App\Models\Inscricao::statusLabel($inscricao->status);
                         @endphp
                         <tr>
                             <td class="font-semibold">
@@ -152,18 +140,18 @@
             </div>
         </div>
 
-    </div>
-    <div x-show="confirmDeleteOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="confirmDeleteOpen=false">
-        <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
-            <h3 class="text-lg font-bold text-slate-900">Confirmar exclusão</h3>
-            <p class="mt-2 text-sm text-slate-600">
-                Deseja realmente excluir a inscrição
-                <span class="font-semibold text-slate-800" x-text="deleteLabel"></span>?
-            </p>
-            <p class="mt-1 text-xs text-red-600">Esta ação é irreversível.</p>
-            <div class="mt-4 flex justify-end gap-2">
-                <button type="button" class="btn-muted" @click="confirmDeleteOpen=false">Cancelar</button>
-                <button type="button" class="btn-danger" @click="if (deleteFormId) { const form = document.getElementById(deleteFormId); if (form) form.submit(); }">Excluir</button>
+        <div x-show="confirmDeleteOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="confirmDeleteOpen=false">
+            <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+                <h3 class="text-lg font-bold text-slate-900">Confirmar exclusão</h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    Deseja realmente excluir a inscrição
+                    <span class="font-semibold text-slate-800" x-text="deleteLabel"></span>?
+                </p>
+                <p class="mt-1 text-xs text-red-600">Esta ação é irreversível.</p>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button type="button" class="btn-muted" @click="confirmDeleteOpen=false">Cancelar</button>
+                    <button type="button" class="btn-danger" @click="if (deleteFormId) { const form = document.getElementById(deleteFormId); if (form) form.submit(); }">Excluir</button>
+                </div>
             </div>
         </div>
     </div>

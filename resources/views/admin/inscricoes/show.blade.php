@@ -72,20 +72,8 @@
 
             <div x-show="tab === 'dados'" x-transition>
                 @php
-                    $statusClass = match($inscricao->status) {
-                        'HOMOLOGADA' => 'status-homologada',
-                        'INDEFERIDA' => 'status-indeferida',
-                        'PRE_APROVADA' => 'bg-cyan-100 text-cyan-700',
-                        'PRE_INDEFERIDA' => 'bg-orange-100 text-orange-700',
-                        default => 'status-recebida',
-                    };
-                    $statusLabel = match($inscricao->status) {
-                        'HOMOLOGADA' => 'Homologada',
-                        'INDEFERIDA' => 'Indeferida',
-                        'PRE_APROVADA' => 'Pré-Aprovado',
-                        'PRE_INDEFERIDA' => 'Pré-Indeferido',
-                        default => 'Em Análise',
-                    };
+                    $statusClass = \App\Models\Inscricao::statusBadgeClass($inscricao->status);
+                    $statusLabel = \App\Models\Inscricao::statusLabel($inscricao->status);
                 @endphp
                 <div class="rounded-xl border border-slate-200 p-4">
                     <div class="mb-4 flex items-center justify-between gap-3">
@@ -111,7 +99,7 @@
                         <p><strong>Última edição:</strong> {{ optional($inscricao->ultimaEdicao?->edited_at)->format('d/m/Y H:i') ?: '-' }}</p>
                         <p><strong>Decidido em:</strong> {{ optional($inscricao->decided_at)->format('d/m/Y H:i') ?: '-' }}</p>
                         <p><strong>Decidido por:</strong> {{ optional($inscricao->decidedByUser)->name ?: '-' }}</p>
-                        <p><strong>Motivo indeferimento:</strong> {{ $inscricao->indeferimento_motivo ?: '-' }}</p>
+                        <p><strong>Motivo da não homologação:</strong> {{ $inscricao->indeferimento_motivo ?: '-' }}</p>
                     </div>
                 </div>
 
@@ -150,7 +138,10 @@
                 <div class="rounded-xl border border-slate-200 p-4">
                     <div class="mb-3 flex items-center justify-between gap-3">
                         <h3 class="text-sm font-semibold text-slate-800">Arquivos enviados</h3>
-                        <span class="text-xs text-slate-500">Use editar para substituir ou excluir arquivo</span>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs text-slate-500">Use editar para substituir ou excluir arquivo</span>
+                            <button type="button" class="btn-primary !px-3 !py-1.5 !text-xs" @click="openDocCreate()">Adicionar documento</button>
+                        </div>
                     </div>
                     <ul class="mt-2 space-y-2">
                         @forelse ($inscricao->documentos as $doc)
@@ -263,47 +254,41 @@
         </div>
 
         <div class="panel-card">
-            <h3 class="text-sm font-semibold text-slate-800">Controle de Status</h3>
-            <p class="mt-1 text-xs text-slate-500">Altere o status final desta inscrição a qualquer momento.</p>
+            <h3 class="text-sm font-semibold text-slate-800">Fluxo da inscrição</h3>
+            <p class="mt-1 text-xs text-slate-500">Toda alteração envia e-mail ao candidato. Primeiro homologue a inscrição; depois defina o resultado final.</p>
             @php
-                $isEmAnaliseAdmin = in_array($inscricao->status, ['RECEBIDA', 'PRE_APROVADA', 'PRE_INDEFERIDA'], true);
-                $isHomologadaAdmin = $inscricao->status === 'HOMOLOGADA';
-                $isIndeferidaAdmin = $inscricao->status === 'INDEFERIDA';
+                $emHomologacao = in_array($inscricao->status, [\App\Models\Inscricao::STATUS_RECEBIDA, \App\Models\Inscricao::STATUS_INDEFERIDA], true);
+                $homologada = $inscricao->status === \App\Models\Inscricao::STATUS_HOMOLOGADA;
+                $finalizada = in_array($inscricao->status, [\App\Models\Inscricao::STATUS_PRE_APROVADA, \App\Models\Inscricao::STATUS_PRE_INDEFERIDA], true);
             @endphp
             <div class="mt-3 flex flex-wrap gap-2">
-                @unless ($isEmAnaliseAdmin)
-                    <form method="POST" action="{{ route('admin.inscricoes.status', $inscricao) }}">
-                        @csrf
-                        <input type="hidden" name="status" value="RECEBIDA">
-                        <button type="submit" class="btn-muted">Em Análise</button>
-                    </form>
-                @endunless
-                @unless ($isHomologadaAdmin)
-                    <form method="POST" action="{{ route('admin.inscricoes.status', $inscricao) }}">
-                        @csrf
-                        <input type="hidden" name="status" value="HOMOLOGADA">
-                        <button type="submit" class="btn-success">Homologada</button>
-                    </form>
-                @endunless
-                @unless ($isIndeferidaAdmin)
-                    <button type="button" class="btn-danger" @click="modalIndeferir = true">Indeferida</button>
-                @endunless
+                @if ($emHomologacao)
+                    <button type="button" class="btn-success" @click="openStatusModal('HOMOLOGADA', 'Homologar inscrição', false)">Homologar</button>
+                    <button type="button" class="btn-danger" @click="openStatusModal('INDEFERIDA', 'Não homologar inscrição', true)">Não homologar</button>
+                @elseif ($homologada)
+                    <button type="button" class="rounded-md bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700" @click="openStatusModal('PRE_APROVADA', 'Classificar inscrição', false)">Classificar</button>
+                    <button type="button" class="rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600" @click="openStatusModal('PRE_INDEFERIDA', 'Colocar em excedente', false)">Colocar em Excedente</button>
+                    <button type="button" class="btn-danger" @click="openStatusModal('INDEFERIDA', 'Não homologar inscrição', true)">Não homologar</button>
+                @elseif ($finalizada)
+                    <button type="button" class="btn-muted" @click="openStatusModal('HOMOLOGADA', 'Voltar à análise', false)">Voltar à Análise</button>
+                @endif
             </div>
         </div>
 
-        <div x-cloak x-show="modalIndeferir" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display: none;" @click.self="modalIndeferir = false">
+        <div x-cloak x-show="statusModal.open" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display: none;" @click.self="closeStatusModal()">
             <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-lg">
-                <h3 class="text-lg font-bold text-slate-900">Definir como indeferida</h3>
+                <h3 class="text-lg font-bold text-slate-900" x-text="statusModal.title"></h3>
                 <form method="POST" action="{{ route('admin.inscricoes.status', $inscricao) }}" class="mt-3 space-y-3">
                     @csrf
-                    <input type="hidden" name="status" value="INDEFERIDA">
-                    <div>
-                        <x-input-label for="indeferimento_motivo" value="Motivo (obrigatório)" />
-                        <textarea id="indeferimento_motivo" name="indeferimento_motivo" rows="4" class="input-base" required>{{ old('indeferimento_motivo', $inscricao->indeferimento_motivo) }}</textarea>
+                    <input type="hidden" name="status" :value="statusModal.status">
+                    <p class="text-sm text-slate-600">Confirme a ação. O sistema enviará e-mail ao candidato após a atualização.</p>
+                    <div x-show="statusModal.requiresReason">
+                        <x-input-label for="indeferimento_motivo" value="Motivo da não homologação (obrigatório)" />
+                        <textarea id="indeferimento_motivo" name="indeferimento_motivo" rows="4" class="input-base" :required="statusModal.requiresReason">{{ old('indeferimento_motivo', $inscricao->indeferimento_motivo) }}</textarea>
                     </div>
                     <div class="flex justify-end gap-2">
-                        <button type="button" class="btn-muted" @click="modalIndeferir = false">Cancelar</button>
-                        <button type="submit" class="btn-danger">Confirmar</button>
+                        <button type="button" class="btn-muted" @click="closeStatusModal()">Cancelar</button>
+                        <button type="submit" class="btn-primary">Confirmar ação</button>
                     </div>
                 </form>
             </div>
@@ -323,6 +308,19 @@
                         <div>
                             <x-input-label for="email" value="E-mail" />
                             <x-text-input id="email" name="email" type="email" class="input-base mt-1" :value="old('email', $inscricao->email)" required />
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="email_confirmado" class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                                <input
+                                    id="email_confirmado"
+                                    name="email_confirmado"
+                                    type="checkbox"
+                                    value="1"
+                                    class="rounded border-slate-300 text-blue-600 shadow-sm focus:ring-blue-500"
+                                    @checked((bool) old('email_confirmado', $inscricao->email_verified_at !== null))
+                                >
+                                E-mail confirmado manualmente pela secretaria
+                            </label>
                         </div>
                         <div>
                             <x-input-label for="cpf" value="CPF" />
@@ -353,6 +351,41 @@
                     <div class="flex justify-end gap-2 pt-2">
                         <button type="button" class="btn-muted" @click="modalDados = false">Cancelar</button>
                         <button type="submit" class="btn-primary">Salvar dados</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div x-cloak x-show="docCreateModal.open" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display: none;" @click.self="closeDocCreate()">
+            <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-lg">
+                <h3 class="text-lg font-bold text-slate-900">Adicionar documento</h3>
+                <form method="POST" action="{{ route('admin.inscricoes.documentos.store', $inscricao) }}" enctype="multipart/form-data" class="mt-4 space-y-3">
+                    @csrf
+                    <div>
+                        <x-input-label for="novo_doc_tipo" value="Tipo do documento" />
+                        <select id="novo_doc_tipo" name="tipo" class="input-base mt-1" required>
+                            <option value="">Selecione</option>
+                            @php
+                                $tiposDocumento = $inscricao->edital->documentosRequeridos
+                                    ->pluck('tipo')
+                                    ->merge($inscricao->documentos->pluck('tipo'))
+                                    ->push('OUTRO_DOCUMENTO')
+                                    ->unique()
+                                    ->values();
+                            @endphp
+                            @foreach ($tiposDocumento as $tipoDocumento)
+                                <option value="{{ $tipoDocumento }}">{{ $tipoDocumento }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <x-input-label for="novo_doc_arquivo" value="Arquivo" />
+                        <input id="novo_doc_arquivo" name="arquivo" type="file" class="input-base mt-1" required>
+                        <p class="mt-1 text-xs text-slate-500">Os formatos permitidos seguem a configuração do edital para o tipo selecionado.</p>
+                    </div>
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button" class="btn-muted" @click="closeDocCreate()">Cancelar</button>
+                        <button type="submit" class="btn-primary">Enviar documento</button>
                     </div>
                 </form>
             </div>
@@ -476,7 +509,12 @@
         function inscricaoAvaliacaoPage(initialAvaliacoes, initialTab) {
             return {
                 tab: initialTab || 'dados',
-                modalIndeferir: false,
+                statusModal: {
+                    open: false,
+                    status: '',
+                    title: '',
+                    requiresReason: false,
+                },
                 modalDados: false,
                 editModal: { open: false },
                 docModal: {
@@ -485,6 +523,9 @@
                     tipo: '',
                     originalName: '',
                     updateUrl: '',
+                },
+                docCreateModal: {
+                    open: false,
                 },
                 docDeleteModal: {
                     open: false,
@@ -532,6 +573,12 @@
                     this.docModal.open = false;
                     this.docModal.updateUrl = '';
                 },
+                openDocCreate() {
+                    this.docCreateModal.open = true;
+                },
+                closeDocCreate() {
+                    this.docCreateModal.open = false;
+                },
                 openDocDelete(docId, tipo, originalName) {
                     this.docDeleteModal.docId = docId;
                     this.docDeleteModal.tipo = tipo || '';
@@ -542,6 +589,18 @@
                 closeDocDelete() {
                     this.docDeleteModal.open = false;
                     this.docDeleteModal.deleteUrl = '';
+                },
+                openStatusModal(status, title, requiresReason) {
+                    this.statusModal.open = true;
+                    this.statusModal.status = status;
+                    this.statusModal.title = title;
+                    this.statusModal.requiresReason = !!requiresReason;
+                },
+                closeStatusModal() {
+                    this.statusModal.open = false;
+                    this.statusModal.status = '';
+                    this.statusModal.title = '';
+                    this.statusModal.requiresReason = false;
                 },
                 requestConfirm(action) {
                     this.confirmModal.action = action;

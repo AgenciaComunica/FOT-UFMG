@@ -8,6 +8,7 @@ use App\Models\Inscricao;
 use App\Models\InscricaoAvaliacao;
 use App\Models\InscricaoDocumento;
 use App\Services\InscricaoPreClassificacaoService;
+use App\Services\InscricaoWorkflowService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,10 @@ use Illuminate\View\View;
 
 class PainelController extends Controller
 {
-    public function __construct(private readonly InscricaoPreClassificacaoService $preClassificacaoService)
+    public function __construct(
+        private readonly InscricaoPreClassificacaoService $preClassificacaoService,
+        private readonly InscricaoWorkflowService $workflowService,
+    )
     {
     }
 
@@ -31,7 +35,7 @@ class PainelController extends Controller
             ->exists();
         $hasPendente = Inscricao::query()
             ->whereIn('status', [
-                Inscricao::STATUS_RECEBIDA,
+                Inscricao::STATUS_HOMOLOGADA,
                 Inscricao::STATUS_PRE_APROVADA,
                 Inscricao::STATUS_PRE_INDEFERIDA,
             ])
@@ -53,7 +57,7 @@ class PainelController extends Controller
         }
         $search = trim((string) $request->string('q')->value());
         $finalStatus = trim((string) $request->string('final_status')->value());
-        if (! in_array($finalStatus, ['', Inscricao::STATUS_RECEBIDA, Inscricao::STATUS_PRE_APROVADA, Inscricao::STATUS_PRE_INDEFERIDA, Inscricao::STATUS_HOMOLOGADA, Inscricao::STATUS_INDEFERIDA], true)) {
+        if (! in_array($finalStatus, ['', Inscricao::STATUS_HOMOLOGADA, Inscricao::STATUS_PRE_APROVADA, Inscricao::STATUS_PRE_INDEFERIDA, Inscricao::STATUS_INDEFERIDA], true)) {
             $finalStatus = '';
         }
         $editalId = (int) $request->integer('edital_id', 0);
@@ -80,7 +84,7 @@ class PainelController extends Controller
             $query
                 ->with(['avaliacoes' => fn ($q) => $q->where('docente_id', $user->id)])
                 ->whereIn('status', [
-                    Inscricao::STATUS_RECEBIDA,
+                    Inscricao::STATUS_HOMOLOGADA,
                     Inscricao::STATUS_PRE_APROVADA,
                     Inscricao::STATUS_PRE_INDEFERIDA,
                 ])
@@ -276,7 +280,7 @@ class PainelController extends Controller
         $this->assertPodeDefinirVeredito($inscricao, $user->id);
 
         $data = $request->validate([
-            'status' => ['required', 'in:RECEBIDA,HOMOLOGADA,INDEFERIDA'],
+            'status' => ['required', 'in:HOMOLOGADA,INDEFERIDA,PRE_APROVADA,PRE_INDEFERIDA'],
             'indeferimento_motivo' => ['nullable', 'string', 'max:4000'],
         ], [
             'status.required' => 'Selecione um status válido.',
@@ -285,50 +289,40 @@ class PainelController extends Controller
 
         if ($data['status'] === Inscricao::STATUS_INDEFERIDA && ! filled($data['indeferimento_motivo'] ?? null)) {
             throw ValidationException::withMessages([
-                'indeferimento_motivo' => 'O motivo é obrigatório para definir como indeferida.',
+                'indeferimento_motivo' => 'O motivo é obrigatório para definir como não homologada.',
             ]);
         }
 
-        if ($data['status'] === Inscricao::STATUS_RECEBIDA) {
-            $inscricao->forceFill([
-                'status' => Inscricao::STATUS_RECEBIDA,
-                'decided_at' => null,
-                'decided_by' => null,
-                'indeferimento_motivo' => null,
-            ])->save();
-        } elseif ($data['status'] === Inscricao::STATUS_HOMOLOGADA) {
-            $inscricao->forceFill([
-                'status' => Inscricao::STATUS_HOMOLOGADA,
-                'decided_at' => now(),
-                'decided_by' => $user->id,
-                'indeferimento_motivo' => null,
-            ])->save();
-        } else {
-            $inscricao->forceFill([
-                'status' => Inscricao::STATUS_INDEFERIDA,
-                'decided_at' => now(),
-                'decided_by' => $user->id,
-                'indeferimento_motivo' => trim((string) $data['indeferimento_motivo']),
-            ])->save();
-        }
+        $temporaryPassword = $this->workflowService->applyStatus(
+            $inscricao->fresh(['edital.documentosRequeridos', 'documentos']),
+            $data['status'],
+            $user->id,
+            $data['indeferimento_motivo'] ?? null,
+        );
 
-        return redirect()
+        $redirect = redirect()
             ->route('docente.inscricoes.show', $inscricao)
             ->with('status', 'Veredito final atualizado com sucesso.');
+
+        if ($temporaryPassword) {
+            $redirect->with('senha_temporaria', $temporaryPassword);
+        }
+
+        return $redirect;
     }
 
     public function definirVereditoFinalLote(Request $request): RedirectResponse
     {
         $user = $request->user();
         $data = $request->validate([
-            'status' => ['required', 'in:RECEBIDA,HOMOLOGADA,INDEFERIDA'],
+            'status' => ['required', 'in:HOMOLOGADA,INDEFERIDA,PRE_APROVADA,PRE_INDEFERIDA'],
             'indeferimento_motivo' => ['nullable', 'string', 'max:4000'],
             'selected_ids' => ['nullable', 'array'],
             'selected_ids.*' => ['integer', 'exists:inscricoes,id'],
         ]);
         if ($data['status'] === Inscricao::STATUS_INDEFERIDA && ! filled($data['indeferimento_motivo'] ?? null)) {
             throw ValidationException::withMessages([
-                'indeferimento_motivo' => 'O motivo é obrigatório para definir como indeferida.',
+                'indeferimento_motivo' => 'O motivo é obrigatório para definir como não homologada.',
             ]);
         }
 
@@ -349,28 +343,12 @@ class PainelController extends Controller
                     continue;
                 }
 
-                if ($data['status'] === Inscricao::STATUS_RECEBIDA) {
-                    $inscricao->forceFill([
-                        'status' => Inscricao::STATUS_RECEBIDA,
-                        'decided_at' => null,
-                        'decided_by' => null,
-                        'indeferimento_motivo' => null,
-                    ])->save();
-                } elseif ($data['status'] === Inscricao::STATUS_HOMOLOGADA) {
-                    $inscricao->forceFill([
-                        'status' => Inscricao::STATUS_HOMOLOGADA,
-                        'decided_at' => now(),
-                        'decided_by' => $user->id,
-                        'indeferimento_motivo' => null,
-                    ])->save();
-                } else {
-                    $inscricao->forceFill([
-                        'status' => Inscricao::STATUS_INDEFERIDA,
-                        'decided_at' => now(),
-                        'decided_by' => $user->id,
-                        'indeferimento_motivo' => trim((string) $data['indeferimento_motivo']),
-                    ])->save();
-                }
+                $this->workflowService->applyStatus(
+                    $inscricao->fresh(['edital.documentosRequeridos', 'documentos']),
+                    $data['status'],
+                    $user->id,
+                    $data['indeferimento_motivo'] ?? null,
+                );
                 $updated++;
             }
         });
@@ -380,7 +358,7 @@ class PainelController extends Controller
 
     private function assertPodeAvaliar(Inscricao $inscricao, int $docenteId): void
     {
-        if (! in_array($inscricao->status, [Inscricao::STATUS_RECEBIDA, Inscricao::STATUS_PRE_APROVADA, Inscricao::STATUS_PRE_INDEFERIDA], true) || $inscricao->email_verified_at === null) {
+        if (! in_array($inscricao->status, [Inscricao::STATUS_HOMOLOGADA, Inscricao::STATUS_PRE_APROVADA, Inscricao::STATUS_PRE_INDEFERIDA], true) || $inscricao->email_verified_at === null) {
             abort(403);
         }
 

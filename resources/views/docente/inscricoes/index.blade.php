@@ -61,14 +61,13 @@
             </div>
             @if ($tab === 'aprovacao')
                 <div>
-                    <x-input-label for="final_status" value="Status final" />
+                    <x-input-label for="final_status" value="Status" />
                     <select id="final_status" name="final_status" class="input-base" @change="$refs.filterForm.submit()">
                         <option value="" @selected($finalStatus === '')>Todos</option>
-                        <option value="RECEBIDA" @selected($finalStatus === 'RECEBIDA')>Em Análise</option>
-                        <option value="PRE_APROVADA" @selected($finalStatus === 'PRE_APROVADA')>Pré-Aprovado</option>
-                        <option value="PRE_INDEFERIDA" @selected($finalStatus === 'PRE_INDEFERIDA')>Pré-Indeferido</option>
                         <option value="HOMOLOGADA" @selected($finalStatus === 'HOMOLOGADA')>Homologada</option>
-                        <option value="INDEFERIDA" @selected($finalStatus === 'INDEFERIDA')>Indeferida</option>
+                        <option value="PRE_APROVADA" @selected($finalStatus === 'PRE_APROVADA')>Classificada</option>
+                        <option value="PRE_INDEFERIDA" @selected($finalStatus === 'PRE_INDEFERIDA')>Excedente</option>
+                        <option value="INDEFERIDA" @selected($finalStatus === 'INDEFERIDA')>Não homologada</option>
                     </select>
                 </div>
             @endif
@@ -81,7 +80,7 @@
 
         @if ($tab === 'aprovacao')
             <div class="flex justify-end">
-                <button type="button" class="btn-primary" x-show="selectedIds.length > 0" @click="bulkModalOpen = true">Aplicar em vários</button>
+                <button type="button" class="btn-primary" x-show="selectedIds.length > 0" @click="bulkModalOpen = true; bulkStatus = 'HOMOLOGADA'">Aplicar em vários</button>
             </div>
         @endif
 
@@ -117,20 +116,8 @@
                             $avaliacaoAtual = $inscricao->avaliacoes->first();
                             $statusAvaliacao = $avaliacaoAtual && $avaliacaoAtual->nota !== null ? 'AVALIADO' : 'PENDENTE';
                             $badge = $statusAvaliacao === 'AVALIADO' ? 'status-homologada' : 'bg-blue-100 text-blue-700';
-                            $statusFinalClass = match($inscricao->status) {
-                                'HOMOLOGADA' => 'status-homologada',
-                                'INDEFERIDA' => 'status-indeferida',
-                                'PRE_APROVADA' => 'bg-cyan-100 text-cyan-700',
-                                'PRE_INDEFERIDA' => 'bg-orange-100 text-orange-700',
-                                default => 'status-recebida',
-                            };
-                            $statusFinalLabel = match($inscricao->status) {
-                                'HOMOLOGADA' => 'Homologada',
-                                'INDEFERIDA' => 'Indeferida',
-                                'PRE_APROVADA' => 'Pré-Aprovado',
-                                'PRE_INDEFERIDA' => 'Pré-Indeferido',
-                                default => 'Em Análise',
-                            };
+                            $statusFinalClass = \App\Models\Inscricao::statusBadgeClass($inscricao->status);
+                            $statusFinalLabel = \App\Models\Inscricao::statusLabel($inscricao->status);
                         @endphp
                         <tr>
                             @if ($tab === 'aprovacao')
@@ -198,13 +185,17 @@
                             <input type="hidden" name="selected_ids[]" :value="id">
                         </template>
                         <div class="flex flex-wrap gap-2">
-                            <button type="button" class="btn-muted" @click="bulkStatus='RECEBIDA'">Em Análise</button>
-                            <button type="button" class="btn-success" @click="bulkStatus='HOMOLOGADA'">Homologar</button>
-                            <button type="button" class="btn-danger" @click="bulkStatus='INDEFERIDA'">Indeferir</button>
+                            <button type="button" class="btn-muted" @click="bulkStatus='HOMOLOGADA'">Voltar à Análise</button>
+                            <button type="button" class="rounded-md bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700" @click="bulkStatus='PRE_APROVADA'">Classificar</button>
+                            <button type="button" class="rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600" @click="bulkStatus='PRE_INDEFERIDA'">Excedente</button>
+                            <button type="button" class="btn-danger" @click="bulkStatus='INDEFERIDA'">Não homologar</button>
                         </div>
                         <div x-show="bulkStatus === 'INDEFERIDA'">
-                            <x-input-label for="bulk_docente_indeferimento_motivo" value="Motivo do indeferimento (obrigatório)" />
+                            <x-input-label for="bulk_docente_indeferimento_motivo" value="Motivo da não homologação (obrigatório)" />
                             <textarea id="bulk_docente_indeferimento_motivo" name="indeferimento_motivo" rows="3" class="input-base"></textarea>
+                        </div>
+                        <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+                            Ao confirmar, o sistema enviará e-mail aos candidatos selecionados.
                         </div>
                         <div class="flex justify-end gap-2 pt-2">
                             <button type="button" class="btn-muted" @click="bulkModalOpen=false">Cancelar</button>
@@ -263,7 +254,7 @@
                 endDate: initialEnd || '',
                 selectedIds: [],
                 bulkModalOpen: false,
-                bulkStatus: 'RECEBIDA',
+                bulkStatus: 'HOMOLOGADA',
                 toggleOne(id, checked) {
                     if (checked) {
                         if (!this.selectedIds.includes(id)) this.selectedIds.push(id);

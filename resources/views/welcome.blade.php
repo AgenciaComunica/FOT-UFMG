@@ -23,7 +23,7 @@
 
         <main
             class="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8"
-            x-data="portalPublico(@js($tab), @js($consultaResultados), @js($consultaTermo), @js($dateStart), @js($dateEnd))"
+            x-data="portalPublico(@js($tab), @js($editalTab), @js($consultaResultados), @js($consultaTermo), @js($dateStart), @js($dateEnd), @js($temEditalAberto), @js($newsletterIframeUrl))"
         >
 
             <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
@@ -38,6 +38,7 @@
                         <h1 class="text-2xl font-extrabold text-slate-900">Editais</h1>
                         <p class="mt-1 text-sm text-slate-600">Consulta de editais e verificação de inscrição.</p>
                     </div>
+                    <button type="button" class="btn-muted" @click="newsletterOpen = true">Assine nossa newsletter</button>
                 </div>
 
                 <div class="mb-5 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
@@ -63,6 +64,7 @@
                     <div class="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <form method="GET" class="space-y-4" x-ref="filterForm">
                             <input type="hidden" name="tab" value="editais">
+                            <input type="hidden" name="edital_tab" x-model="editalTab">
                             <input type="hidden" name="data_inicio" x-model="startDate">
                             <input type="hidden" name="data_fim" x-model="endDate">
 
@@ -102,9 +104,8 @@
                                         type="text"
                                         value="{{ $q }}"
                                         data-preserve-focus="1"
-                                        placeholder="Título ou descrição"
+                                        placeholder="Pesquise o edital pelo nome ou descrição"
                                         class="input-base"
-                                        @input="clearTimeout(timer); timer = setTimeout(() => $refs.filterForm.submit(), 350)"
                                     >
                                 </div>
                                 <div>
@@ -112,8 +113,9 @@
                                     <input type="text" x-ref="range" class="input-base" readonly>
                                 </div>
                                 <div class="flex gap-2">
+                                    <button type="submit" class="btn-primary">Pesquisar</button>
                                     @if ($filtroAlterado)
-                                        <a href="{{ route('home', ['tab' => 'editais']) }}" class="btn-muted">Limpar</a>
+                                        <a :href="clearEditaisUrl()" href="{{ route('home', ['tab' => 'editais']) }}" class="btn-muted">Limpar</a>
                                     @endif
                                 </div>
                             </div>
@@ -378,22 +380,55 @@
                     @endif
                 </div>
             </section>
+
+            <div
+                x-show="newsletterOpen"
+                x-transition
+                class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
+                style="display: none;"
+                @click.self="closeNewsletter()"
+            >
+                <div class="relative w-full max-w-2xl overflow-hidden rounded-3xl shadow-2xl">
+                    <button
+                        type="button"
+                        class="absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-white/15 text-white backdrop-blur hover:bg-white/25"
+                        @click="closeNewsletter()"
+                    >
+                        ✕
+                    </button>
+                    <iframe :src="newsletterIframeUrl" class="h-[520px] w-full border-0 bg-transparent"></iframe>
+                </div>
+            </div>
         </main>
 
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
         <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
         <script>
-            function portalPublico(initialTab, initialConsultaResultados, initialConsultaTermo, initialStart, initialEnd) {
+            function portalPublico(initialTab, initialEditalTab, initialConsultaResultados, initialConsultaTermo, initialStart, initialEnd, hasOpenEdital, newsletterIframeUrl) {
                 return {
                     mainTab: initialTab || 'editais',
-                    editalTab: 'abertos',
-                    timer: null,
+                    editalTab: initialEditalTab || 'abertos',
                     startDate: initialStart || '',
                     endDate: initialEnd || '',
+                    hasOpenEdital: !!hasOpenEdital,
+                    newsletterOpen: false,
+                    newsletterIframeUrl: newsletterIframeUrl || '',
                     consultaResultados: Array.isArray(initialConsultaResultados) ? initialConsultaResultados : [],
                     consultaTermo: initialConsultaTermo || '',
                     init() {
+                        const sessionKey = 'fot-newsletter-popup-opened';
+                        if (!this.hasOpenEdital && !window.sessionStorage.getItem(sessionKey)) {
+                            this.newsletterOpen = true;
+                            window.sessionStorage.setItem(sessionKey, '1');
+                        }
+
+                        window.addEventListener('message', (event) => {
+                            if (event?.data?.type === 'newsletter-close') {
+                                this.closeNewsletter();
+                            }
+                        });
+
                         if (typeof flatpickr === 'undefined') {
                             return;
                         }
@@ -415,10 +450,20 @@
                                     this.startDate = instance.formatDate(selectedDates[0], 'Y-m-d');
                                     this.endDate = instance.formatDate(selectedDates[1], 'Y-m-d');
                                     instance.input.value = this.formatLabel(this.startDate, this.endDate);
-                                    this.$nextTick(() => this.$refs.filterForm.submit());
                                 }
                             },
                         });
+                    },
+                    closeNewsletter() {
+                        this.newsletterOpen = false;
+                    },
+                    clearEditaisUrl() {
+                        const params = new URLSearchParams({
+                            tab: 'editais',
+                            edital_tab: this.editalTab || 'abertos',
+                        });
+
+                        return `/?${params.toString()}`;
                     },
                     formatLabel(start, end) {
                         if (!start || !end) return 'Selecione um período';

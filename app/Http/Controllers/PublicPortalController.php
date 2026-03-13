@@ -24,6 +24,10 @@ class PublicPortalController extends Controller
         if (! in_array($tab, ['editais', 'verificar'], true)) {
             $tab = 'editais';
         }
+        $editalTab = $request->string('edital_tab')->value();
+        if (! in_array($editalTab, ['abertos', 'encerrados', 'proximos'], true)) {
+            $editalTab = 'abertos';
+        }
 
         $q = trim((string) $request->string('q')->value());
         $dateStart = $this->parseDate($request->string('data_inicio')->value(), false);
@@ -67,6 +71,7 @@ class PublicPortalController extends Controller
 
         return view('welcome', [
             'tab' => $tab,
+            'editalTab' => $editalTab,
             'q' => $q,
             'dateStart' => $dateStart?->format('Y-m-d'),
             'dateEnd' => $dateEnd?->format('Y-m-d'),
@@ -76,6 +81,8 @@ class PublicPortalController extends Controller
             'filtroAlterado' => $q !== '' || (bool) $dateStart || (bool) $dateEnd,
             'consultaResultados' => $request->session()->pull('consulta_resultados', []),
             'consultaTermo' => $request->session()->pull('consulta_termo', ''),
+            'newsletterIframeUrl' => route('public.leads.iframe'),
+            'temEditalAberto' => $abertos->isNotEmpty(),
             'infoEmailError' => $request->session()->pull('info_email_error', ''),
             'infoEmailTargetId' => (int) $request->session()->pull('info_email_target_id', 0),
             'editLinkError' => $request->session()->pull('edit_link_error', ''),
@@ -199,13 +206,13 @@ class PublicPortalController extends Controller
                 ]);
         }
 
-        if (! $inscricao->edital?->isAberto() || $inscricao->status !== Inscricao::STATUS_RECEBIDA) {
+        if (! $inscricao->edital?->isAberto() || ! $inscricao->permiteEdicaoPublica()) {
             return redirect()
                 ->route('home', ['tab' => 'verificar'])
                 ->with([
                     'consulta_resultados' => $resultados,
                     'consulta_termo' => $consultaTermo,
-                    'edit_link_error' => 'A edição está disponível apenas para inscrições em análise, durante o período aberto do edital.',
+                    'edit_link_error' => 'A edição está disponível apenas para inscrições em homologação ou não homologadas, durante o período aberto do edital.',
                     'edit_link_target_id' => $inscricao->id,
                 ]);
         }
@@ -288,11 +295,11 @@ class PublicPortalController extends Controller
     private function statusPublico(string $status): string
     {
         return match ($status) {
-            Inscricao::STATUS_PRE_APROVADA => 'Pré-Aprovado',
-            Inscricao::STATUS_PRE_INDEFERIDA => 'Pré-Indeferido',
+            Inscricao::STATUS_PRE_APROVADA => 'Classificada',
+            Inscricao::STATUS_PRE_INDEFERIDA => 'Excedente',
             Inscricao::STATUS_HOMOLOGADA => 'Homologada',
-            Inscricao::STATUS_INDEFERIDA => 'Indeferida',
-            default => 'Em análise',
+            Inscricao::STATUS_INDEFERIDA => 'Não homologada',
+            default => 'Em homologação',
         };
     }
 
@@ -371,7 +378,7 @@ class PublicPortalController extends Controller
 
         return $query->map(function (Inscricao $inscricao): array {
             $canRequestEditLink = (bool) $inscricao->edital?->isAberto()
-                && $inscricao->status === Inscricao::STATUS_RECEBIDA;
+                && $inscricao->permiteEdicaoPublica();
 
             return [
                 'id' => $inscricao->id,

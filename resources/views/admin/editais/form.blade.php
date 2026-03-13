@@ -30,7 +30,7 @@
             $numeroVagasInicial = old('numero_vagas', $edital->numero_vagas);
         @endphp
 
-        <form method="POST" action="{{ $formAction }}" enctype="multipart/form-data" class="panel-card space-y-6" x-data="editalDocsForm(@js($documentosInitial), @js($bancaDocentesInitial), @js($docentesDisponiveis), @js($criterioNotaInicial), @js($notaFixaInicial), @js($offsetInicial), @js($numeroVagasInicial), {{ $publicadoInicial ? 'true' : 'false' }}, {{ $isEdit ? 'true' : 'false' }}, {{ $hasArquivoAtual ? 'true' : 'false' }}, @js($edital->titulo ?? ''))">
+        <form method="POST" action="{{ $formAction }}" enctype="multipart/form-data" class="panel-card space-y-6" x-data="editalDocsForm(@js($documentosInitial), @js($bancaDocentesInitial), @js($docentesDisponiveis), @js($criterioNotaInicial), @js($notaFixaInicial), @js($offsetInicial), @js($numeroVagasInicial), {{ $publicadoInicial ? 'true' : 'false' }}, {{ $isEdit ? 'true' : 'false' }}, {{ $hasArquivoAtual ? 'true' : 'false' }}, @js($edital->titulo ?? ''), {{ (int) ($edital->inscricoes_count ?? 0) }})">
             @csrf
             @if ($method !== 'POST')
                 @method($method)
@@ -171,8 +171,13 @@
                                     <select :name="`banca_docentes[${index}][user_id]`" x-model="bancaDocentes[index].user_id" @change="handleDocenteSelection(index)" class="input-base mt-1">
                                         <option value="">Selecione</option>
                                         <option value="__new_docente__">+ Novo Docente</option>
-                                        <template x-for="docente in availableDocentes(index)" :key="`opt-${index}-${docente.id}`">
-                                            <option :value="String(docente.id)" x-text="`${docente.name} (${docente.email})${docente.ativo ? '' : ' - Inativo'}`"></option>
+                                        <template x-for="docente in docentesDisponiveis" :key="`opt-${index}-${docente.id}`">
+                                            <option
+                                                :value="String(docente.id)"
+                                                :selected="String(bancaDocentes[index].user_id ?? '') === String(docente.id)"
+                                                :disabled="isDocenteDisabled(index, docente.id)"
+                                                x-text="`${docente.name} (${docente.email})${docente.ativo ? '' : ' - Inativo'}`"
+                                            ></option>
                                         </template>
                                     </select>
                                 </div>
@@ -340,6 +345,13 @@
                     <div class="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
                         <h4 class="text-base font-semibold text-slate-900">Excluir edital</h4>
                         <p class="mt-2 text-sm text-slate-600">Digite o nome do edital para confirmar a exclusão:</p>
+                        <p
+                            x-show="deleteInscricoesCount > 0"
+                            x-transition
+                            class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                        >
+                            Esta ação irá deletar todas as inscrições vinculadas a este edital.
+                        </p>
                         <p class="mt-2 rounded-md bg-slate-100 px-2 py-1 text-sm font-semibold text-slate-800" x-text="deleteExpectedName"></p>
                         <div class="mt-3">
                             <input
@@ -374,7 +386,7 @@
     </div>
 
     <script>
-        function editalDocsForm(initialDocs, bancaDocentesInitial, docentesDisponiveis, criterioNotaInicial, notaFixaInicial, offsetInicial, numeroVagasInicial, publicadoInicial, isEdit, hasArquivoPersistido, deleteExpectedName) {
+        function editalDocsForm(initialDocs, bancaDocentesInitial, docentesDisponiveis, criterioNotaInicial, notaFixaInicial, offsetInicial, numeroVagasInicial, publicadoInicial, isEdit, hasArquivoPersistido, deleteExpectedName, deleteInscricoesCount) {
             const normalized = (Array.isArray(initialDocs) ? initialDocs : []).map((doc, idx) => ({
                 key: `doc-${Date.now()}-${idx}`,
                 tipo: doc?.tipo ?? '',
@@ -413,6 +425,7 @@
                 confirmRemoveIndex: null,
                 confirmDeleteOpen: false,
                 deleteExpectedName: deleteExpectedName ?? '',
+                deleteInscricoesCount: Number(deleteInscricoesCount || 0),
                 deleteNameConfirm: '',
                 publishBlockModalOpen: false,
                 publishMissingFields: [],
@@ -440,6 +453,14 @@
                 availableDocentes(index) {
                     const selected = this.selectedDocentes(index);
                     return this.docentesDisponiveis.filter((docente) => !selected.includes(String(docente.id)));
+                },
+                isDocenteDisabled(index, docenteId) {
+                    const selectedId = String(this.bancaDocentes[index]?.user_id ?? '').trim();
+                    if (selectedId === String(docenteId)) {
+                        return false;
+                    }
+
+                    return this.selectedDocentes(index).includes(String(docenteId));
                 },
                 sortearDocente(index) {
                     const pool = this.availableDocentes(index);
