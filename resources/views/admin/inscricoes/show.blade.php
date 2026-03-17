@@ -280,7 +280,7 @@
                 <form method="POST" action="{{ route('admin.inscricoes.status', $inscricao) }}" class="mt-3 space-y-3">
                     @csrf
                     <input type="hidden" name="status" :value="statusModal.status">
-                    <p class="text-sm text-slate-600">Confirme a ação. O sistema enviará e-mail ao candidato após a atualização.</p>
+                    <p class="text-sm text-slate-600" x-text="statusModalMessage()"></p>
                     <div x-show="statusModal.requiresReason">
                         <x-input-label for="indeferimento_motivo" value="Motivo da não homologação (obrigatório)" />
                         <textarea id="indeferimento_motivo" name="indeferimento_motivo" rows="4" class="input-base" :required="statusModal.requiresReason">{{ old('indeferimento_motivo', $inscricao->indeferimento_motivo) }}</textarea>
@@ -583,6 +583,13 @@
                     this.statusModal.status = '';
                     this.statusModal.title = '';
                     this.statusModal.requiresReason = false;
+                },
+                statusModalMessage() {
+                    if ([ 'INDEFERIDA', 'PRE_APROVADA', 'PRE_INDEFERIDA' ].includes(this.statusModal.status)) {
+                        return 'Confirme a ação. O sistema enviará e-mail ao candidato após a atualização.';
+                    }
+
+                    return 'Confirme a ação para atualizar o status da inscrição.';
                 },
                 requestConfirm(action) {
                     this.confirmModal.action = action;

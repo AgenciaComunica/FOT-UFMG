@@ -9,7 +9,7 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ tab: 'dados', statusModal: { open: false, status: '', title: '', requiresReason: false }, openStatusModal(status, title, requiresReason = false) { this.statusModal = { open: true, status, title, requiresReason }; }, closeStatusModal() { this.statusModal = { open: false, status: '', title: '', requiresReason: false }; } }">
+    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ tab: 'dados', statusModal: { open: false, status: '', title: '', requiresReason: false }, openStatusModal(status, title, requiresReason = false) { this.statusModal = { open: true, status, title, requiresReason }; }, closeStatusModal() { this.statusModal = { open: false, status: '', title: '', requiresReason: false }; }, statusModalMessage() { return ['INDEFERIDA', 'PRE_APROVADA', 'PRE_INDEFERIDA'].includes(this.statusModal.status) ? 'Confirme a ação. O sistema enviará e-mail ao candidato após a atualização.' : 'Confirme a ação para atualizar o status da inscrição.'; } }">
         @if (session('status'))
             <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{{ session('status') }}</div>
         @endif
@@ -169,7 +169,7 @@
                     <form method="POST" action="{{ route('docente.inscricoes.status', $inscricao) }}" class="mt-3 space-y-3">
                         @csrf
                         <input type="hidden" name="status" :value="statusModal.status">
-                        <p class="text-sm text-slate-600">Confirme a ação. O sistema enviará e-mail ao candidato após a atualização.</p>
+                        <p class="text-sm text-slate-600" x-text="statusModalMessage()"></p>
                         <div x-show="statusModal.requiresReason">
                             <x-input-label for="indeferimento_motivo_docente" value="Motivo da não homologação (obrigatório)" />
                             <textarea id="indeferimento_motivo_docente" name="indeferimento_motivo" rows="4" class="input-base" :required="statusModal.requiresReason">{{ old('indeferimento_motivo', $inscricao->indeferimento_motivo) }}</textarea>
