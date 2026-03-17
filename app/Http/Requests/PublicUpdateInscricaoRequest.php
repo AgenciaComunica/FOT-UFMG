@@ -23,8 +23,6 @@ class PublicUpdateInscricaoRequest extends FormRequest
             'email' => ['required', 'email:rfc,dns', 'max:255'],
             'cpf' => ['required', 'string', 'max:20'],
             'telefone' => ['nullable', 'string', 'max:30'],
-            'inicio_programa_semestre' => ['required', 'integer', 'in:1,2'],
-            'inicio_programa_ano' => ['required', 'integer', 'min:'.now()->year, 'max:'.(now()->year + 10)],
             'motivo_edicao' => ['required', 'string', 'min:5', 'max:1000'],
             'documentos' => ['nullable', 'array'],
             'documentos.*' => ['nullable', 'file', 'max:'.$maxPdfKb],

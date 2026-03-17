@@ -50,26 +50,6 @@
                     <x-input-label for="email" value="Email" />
                     <x-text-input id="email" name="email" type="email" class="input-base" :value="old('email', $inscricao->email)" required />
                 </div>
-
-                <div class="grid gap-4 md:grid-cols-2">
-                    <div>
-                        <x-input-label for="inicio_programa_semestre" value="Semestre desejado para início" />
-                        <select id="inicio_programa_semestre" name="inicio_programa_semestre" class="input-base" required>
-                            <option value="">Selecione</option>
-                            <option value="1" @selected((int) old('inicio_programa_semestre', $inscricao->inicio_programa_semestre) === 1)>1º semestre</option>
-                            <option value="2" @selected((int) old('inicio_programa_semestre', $inscricao->inicio_programa_semestre) === 2)>2º semestre</option>
-                        </select>
-                    </div>
-                    <div>
-                        <x-input-label for="inicio_programa_ano" value="Ano desejado para início" />
-                        <select id="inicio_programa_ano" name="inicio_programa_ano" class="input-base" required>
-                            <option value="">Selecione</option>
-                            @for ($ano = now()->year; $ano <= now()->year + 10; $ano++)
-                                <option value="{{ $ano }}" @selected((int) old('inicio_programa_ano', $inscricao->inicio_programa_ano) === $ano)>{{ $ano }}</option>
-                            @endfor
-                        </select>
-                    </div>
-                </div>
             </section>
 
             <section class="panel-card space-y-4">

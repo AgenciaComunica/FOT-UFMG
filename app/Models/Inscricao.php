@@ -60,8 +60,6 @@ class Inscricao extends Model
         'email',
         'cpf',
         'telefone',
-        'inicio_programa_semestre',
-        'inicio_programa_ano',
         'email_verification_token',
         'verification_sent_at',
         'email_verified_at',
@@ -88,8 +86,6 @@ class Inscricao extends Model
             'edit_link_sent_at' => 'datetime',
             'edit_link_expires_at' => 'datetime',
             'edit_link_used_at' => 'datetime',
-            'inicio_programa_semestre' => 'integer',
-            'inicio_programa_ano' => 'integer',
         ];
     }
 

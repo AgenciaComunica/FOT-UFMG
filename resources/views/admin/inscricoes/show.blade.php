@@ -93,7 +93,6 @@
                         </p>
                         <p><strong>CPF:</strong> {{ $inscricao->cpf }}</p>
                         <p><strong>Telefone:</strong> {{ $inscricao->telefone ?: '-' }}</p>
-                        <p><strong>Início desejado:</strong> {{ $inscricao->inicio_programa_semestre ? $inscricao->inicio_programa_semestre.'º semestre/'.$inscricao->inicio_programa_ano : '-' }}</p>
                         <p><strong>Status:</strong> <span class="status-badge {{ $statusClass }}">{{ $statusLabel }}</span></p>
                         <p><strong>Enviado em:</strong> {{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</p>
                         <p><strong>Última edição:</strong> {{ optional($inscricao->ultimaEdicao?->edited_at)->format('d/m/Y H:i') ?: '-' }}</p>
@@ -329,23 +328,6 @@
                         <div class="md:col-span-2">
                             <x-input-label for="telefone" value="Telefone" />
                             <x-text-input id="telefone" name="telefone" type="text" class="input-base mt-1" :value="old('telefone', $inscricao->telefone)" />
-                        </div>
-                        <div>
-                            <x-input-label for="inicio_programa_semestre" value="Semestre desejado" />
-                            <select id="inicio_programa_semestre" name="inicio_programa_semestre" class="input-base mt-1" required>
-                                <option value="">Selecione</option>
-                                <option value="1" @selected((int) old('inicio_programa_semestre', $inscricao->inicio_programa_semestre) === 1)>1º semestre</option>
-                                <option value="2" @selected((int) old('inicio_programa_semestre', $inscricao->inicio_programa_semestre) === 2)>2º semestre</option>
-                            </select>
-                        </div>
-                        <div>
-                            <x-input-label for="inicio_programa_ano" value="Ano desejado" />
-                            <select id="inicio_programa_ano" name="inicio_programa_ano" class="input-base mt-1" required>
-                                <option value="">Selecione</option>
-                                @for ($ano = now()->year; $ano <= now()->year + 10; $ano++)
-                                    <option value="{{ $ano }}" @selected((int) old('inicio_programa_ano', $inscricao->inicio_programa_ano) === $ano)>{{ $ano }}</option>
-                                @endfor
-                            </select>
                         </div>
                     </div>
                     <div class="flex justify-end gap-2 pt-2">
