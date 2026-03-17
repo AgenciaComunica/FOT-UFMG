@@ -258,8 +258,6 @@ class InscricaoController extends Controller
             'email' => $data['email'],
             'cpf' => $data['cpf'],
             'telefone' => $data['telefone'] ?? null,
-            'inicio_programa_semestre' => (int) $data['inicio_programa_semestre'],
-            'inicio_programa_ano' => (int) $data['inicio_programa_ano'],
             'email_verified_at' => $emailVerifiedAt,
             'email_verification_token' => $emailVerificationToken,
             'verification_sent_at' => $verificationSentAt,

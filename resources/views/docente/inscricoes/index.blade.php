@@ -194,8 +194,7 @@
                             <x-input-label for="bulk_docente_indeferimento_motivo" value="Motivo da não homologação (obrigatório)" />
                             <textarea id="bulk_docente_indeferimento_motivo" name="indeferimento_motivo" rows="3" class="input-base"></textarea>
                         </div>
-                        <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
-                            Ao confirmar, o sistema enviará e-mail aos candidatos selecionados.
+                        <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700" x-text="['HOMOLOGADA', 'INDEFERIDA', 'PRE_APROVADA', 'PRE_INDEFERIDA'].includes(bulkStatus) ? 'Ao confirmar, o sistema enviará e-mail aos candidatos selecionados.' : 'Ao confirmar, o sistema atualizará o status das inscrições selecionadas.'">
                         </div>
                         <div class="flex justify-end gap-2 pt-2">
                             <button type="button" class="btn-muted" @click="bulkModalOpen=false">Cancelar</button>

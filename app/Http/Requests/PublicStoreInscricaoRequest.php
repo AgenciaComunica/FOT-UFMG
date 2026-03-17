@@ -24,8 +24,6 @@ class PublicStoreInscricaoRequest extends FormRequest
             'email' => ['required', 'email:rfc,dns', 'max:255', Rule::unique(Inscricao::class, 'email')],
             'cpf' => ['required', 'string', 'max:20', Rule::unique(Inscricao::class, 'cpf')],
             'telefone' => ['nullable', 'string', 'max:30'],
-            'inicio_programa_semestre' => ['required', 'integer', 'in:1,2'],
-            'inicio_programa_ano' => ['required', 'integer', 'min:'.now()->year, 'max:'.(now()->year + 10)],
             'documentos' => ['nullable', 'array'],
             'documentos.*' => ['nullable', 'file', 'max:'.$maxPdfKb],
         ];
@@ -120,11 +118,6 @@ class PublicStoreInscricaoRequest extends FormRequest
         return [
             'email.unique' => 'Este e-mail já possui uma inscrição cadastrada. Em caso de erro, entre em contato com a secretaria.',
             'cpf.unique' => 'Este CPF já possui uma inscrição cadastrada. Em caso de erro, entre em contato com a secretaria.',
-            'inicio_programa_semestre.required' => 'Selecione o semestre desejado para início.',
-            'inicio_programa_semestre.in' => 'Semestre inválido. Selecione 1º ou 2º semestre.',
-            'inicio_programa_ano.required' => 'Selecione o ano desejado para início.',
-            'inicio_programa_ano.min' => 'Ano de início inválido.',
-            'inicio_programa_ano.max' => 'Ano de início inválido.',
         ];
     }
 }
