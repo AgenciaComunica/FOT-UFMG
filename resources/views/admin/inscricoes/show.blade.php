@@ -585,7 +585,7 @@
                     this.statusModal.requiresReason = false;
                 },
                 statusModalMessage() {
-                    if ([ 'INDEFERIDA', 'PRE_APROVADA', 'PRE_INDEFERIDA' ].includes(this.statusModal.status)) {
+                    if ([ 'HOMOLOGADA', 'INDEFERIDA', 'PRE_APROVADA', 'PRE_INDEFERIDA' ].includes(this.statusModal.status)) {
                         return 'Confirme a ação. O sistema enviará e-mail ao candidato após a atualização.';
                     }
 

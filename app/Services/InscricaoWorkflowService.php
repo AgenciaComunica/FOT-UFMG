@@ -80,6 +80,8 @@ class InscricaoWorkflowService
             'user_id' => null,
         ])->save();
 
+        $this->enviarResultadoInscricao($inscricao);
+
         return null;
     }
 

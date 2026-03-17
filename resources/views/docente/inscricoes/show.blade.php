@@ -9,7 +9,7 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ tab: 'dados', statusModal: { open: false, status: '', title: '', requiresReason: false }, openStatusModal(status, title, requiresReason = false) { this.statusModal = { open: true, status, title, requiresReason }; }, closeStatusModal() { this.statusModal = { open: false, status: '', title: '', requiresReason: false }; }, statusModalMessage() { return ['INDEFERIDA', 'PRE_APROVADA', 'PRE_INDEFERIDA'].includes(this.statusModal.status) ? 'Confirme a ação. O sistema enviará e-mail ao candidato após a atualização.' : 'Confirme a ação para atualizar o status da inscrição.'; } }">
+    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="{ tab: 'dados', statusModal: { open: false, status: '', title: '', requiresReason: false }, openStatusModal(status, title, requiresReason = false) { this.statusModal = { open: true, status, title, requiresReason }; }, closeStatusModal() { this.statusModal = { open: false, status: '', title: '', requiresReason: false }; }, statusModalMessage() { return ['HOMOLOGADA', 'INDEFERIDA', 'PRE_APROVADA', 'PRE_INDEFERIDA'].includes(this.statusModal.status) ? 'Confirme a ação. O sistema enviará e-mail ao candidato após a atualização.' : 'Confirme a ação para atualizar o status da inscrição.'; } }">
         @if (session('status'))
             <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{{ session('status') }}</div>
         @endif
