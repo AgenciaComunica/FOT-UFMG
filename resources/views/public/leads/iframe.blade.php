@@ -30,23 +30,23 @@
                 </p>
             </div>
 
-            @if (session('status'))
+            @if ($statusMessage)
                 <div class="py-6 text-center">
                     <div class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0l-3.25-3.25a1 1 0 011.414-1.414l2.543 2.543 6.543-6.543a1 1 0 011.414 0z" clip-rule="evenodd" />
                         </svg>
                     </div>
-                    <p class="text-base font-semibold text-slate-900">{{ session('status') }}</p>
+                    <p class="text-base font-semibold text-slate-900">{{ $statusMessage }}</p>
                     <button type="button" class="btn-primary mt-6 w-full" @click="closeNow()">
                         Sair <span x-text="countdown > 0 ? `(${countdown}s)` : ''"></span>
                     </button>
                 </div>
             @else
-                @if ($errors->any())
+                @if ($formErrors->any())
                     <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                         <ul class="list-disc pl-5">
-                            @foreach ($errors->all() as $error)
+                            @foreach ($formErrors->all() as $error)
                                 <li>{{ $error }}</li>
                             @endforeach
                         </ul>
@@ -58,11 +58,11 @@
                     <input type="text" name="{{ $honeypotField }}" class="hidden" tabindex="-1" autocomplete="off">
                     <div>
                         <label for="nome" class="mb-1 block text-sm font-semibold text-slate-700">Nome</label>
-                        <input id="nome" name="nome" type="text" class="input-base !mt-0" value="{{ old('nome') }}" required>
+                        <input id="nome" name="nome" type="text" class="input-base !mt-0" value="{{ $oldInput['nome'] ?? '' }}" required>
                     </div>
                     <div>
                         <label for="email" class="mb-1 block text-sm font-semibold text-slate-700">E-mail</label>
-                        <input id="email" name="email" type="email" class="input-base !mt-0" value="{{ old('email') }}" required>
+                        <input id="email" name="email" type="email" class="input-base !mt-0" value="{{ $oldInput['email'] ?? '' }}" required>
                     </div>
                     <button type="submit" class="btn-primary w-full">Quero receber novidades</button>
                 </form>
@@ -76,7 +76,7 @@
             return {
                 countdown: 5,
                 timerId: null,
-                hasSuccess: {{ session()->has('status') ? 'true' : 'false' }},
+                hasSuccess: {{ $statusMessage ? 'true' : 'false' }},
                 init() {
                     if (!this.hasSuccess) {
                         return;
