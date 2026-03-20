@@ -67,6 +67,7 @@ Route::prefix('admin')
         Route::resource('docentes', AdminDocenteController::class, ['parameters' => ['docentes' => 'docente']])->except(['show']);
         Route::resource('leads', AdminLeadController::class, ['parameters' => ['leads' => 'lead']])->except(['show']);
         Route::post('leads/disparo-manual', [AdminLeadController::class, 'sendManual'])->name('leads.send-manual');
+        Route::post('leads/exportar', [AdminLeadController::class, 'exportSelected'])->name('leads.export');
         Route::post('leads/importar', [AdminLeadController::class, 'import'])->name('leads.import');
         Route::get('leads/modelo-importacao', [AdminLeadController::class, 'downloadTemplate'])->name('leads.template');
         Route::post('docentes/importar', [AdminDocenteController::class, 'import'])->name('docentes.import');

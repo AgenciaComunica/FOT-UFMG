@@ -57,11 +57,25 @@
             </div>
         </form>
 
-        <div class="flex justify-end">
+        <div class="flex justify-end gap-2">
             <button
                 type="button"
-                class="inline-flex h-[42px] items-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
-                x-show="selectedIds.length > 0"
+                class="inline-flex h-[42px] items-center rounded-md px-4 text-sm font-semibold transition"
+                :class="selectedIds.length > 0
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    : 'cursor-not-allowed bg-slate-200 text-slate-400'"
+                :disabled="selectedIds.length === 0"
+                @click="exportModalOpen = true"
+            >
+                Exportar Leads (CSV/XLS)
+            </button>
+            <button
+                type="button"
+                class="inline-flex h-[42px] items-center rounded-md px-4 text-sm font-semibold transition"
+                :class="selectedIds.length > 0
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'cursor-not-allowed bg-slate-200 text-slate-400'"
+                :disabled="selectedIds.length === 0"
                 @click="sendModalOpen = true"
             >
                 Disparar aviso
@@ -171,6 +185,36 @@
                     <div class="flex justify-end gap-2">
                         <button type="button" class="btn-muted" @click="sendModalOpen = false">Cancelar</button>
                         <button type="submit" class="btn-primary">Enviar aviso</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div x-show="exportModalOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="exportModalOpen = false">
+            <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-lg">
+                <h3 class="text-lg font-bold text-slate-900">Exportar leads selecionados</h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    <span class="font-semibold text-slate-900" x-text="selectedIds.length"></span>
+                    lead(s) selecionado(s) para exportação.
+                </p>
+                <form method="POST" action="{{ route('admin.leads.export') }}" class="mt-4 space-y-3">
+                    @csrf
+                    <template x-for="id in selectedIds" :key="`export-lead-${id}`">
+                        <input type="hidden" name="selected_ids[]" :value="id">
+                    </template>
+                    <div>
+                        <x-input-label for="formato_exportacao" value="Formato do arquivo" />
+                        <select id="formato_exportacao" name="formato" class="input-base mt-1" required>
+                            <option value="csv">CSV</option>
+                            <option value="xls">Excel (.xls)</option>
+                        </select>
+                    </div>
+                    <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+                        A exportação incluirá apenas os leads selecionados na tabela.
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <button type="button" class="btn-muted" @click="exportModalOpen = false">Cancelar</button>
+                        <button type="submit" class="btn-primary">Exportar</button>
                     </div>
                 </form>
             </div>
@@ -293,6 +337,7 @@
             return {
                 timer: null,
                 sendModalOpen: false,
+                exportModalOpen: false,
                 openImportModal: {{ $errors->has('arquivo') ? 'true' : 'false' }},
                 openImportResultModal: {{ session()->has('import_result') ? 'true' : 'false' }},
                 selectedIds: [],

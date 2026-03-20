@@ -278,6 +278,62 @@ class LeadController extends Controller
             ->with('status', "Disparo realizado para {$sent} lead(s).");
     }
 
+    public function exportSelected(Request $request)
+    {
+        $data = $request->validate([
+            'selected_ids' => ['required', 'array'],
+            'selected_ids.*' => ['integer', 'exists:leads,id'],
+            'formato' => ['required', 'in:csv,xls'],
+        ], [
+            'selected_ids.required' => 'Selecione ao menos um lead para exportação.',
+            'formato.required' => 'Selecione o formato de exportação.',
+            'formato.in' => 'Formato de exportação inválido.',
+        ]);
+
+        $leadIds = collect($data['selected_ids'])->map(fn ($id) => (int) $id)->unique()->values();
+        if ($leadIds->isEmpty()) {
+            throw ValidationException::withMessages([
+                'selected_ids' => 'Selecione ao menos um lead para exportação.',
+            ]);
+        }
+
+        $leads = Lead::query()
+            ->whereIn('id', $leadIds)
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'email', 'updated_at', 'last_notified_at']);
+
+        $filenameBase = 'leads-selecionados-'.now()->format('Ymd-His');
+
+        if ($data['formato'] === 'csv') {
+            return response()->streamDownload(function () use ($leads): void {
+                $handle = fopen('php://output', 'w');
+                fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+                fputcsv($handle, ['ID', 'Nome', 'E-mail', 'Último cadastro', 'Último disparo'], ';');
+
+                foreach ($leads as $lead) {
+                    fputcsv($handle, [
+                        $lead->id,
+                        $lead->nome,
+                        $lead->email,
+                        optional($lead->updated_at)->format('d/m/Y H:i'),
+                        optional($lead->last_notified_at)->format('d/m/Y H:i'),
+                    ], ';');
+                }
+
+                fclose($handle);
+            }, $filenameBase.'.csv', [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+            ]);
+        }
+
+        return response()
+            ->view('admin.leads.export_xls', [
+                'leads' => $leads,
+            ])
+            ->header('Content-Type', 'application/vnd.ms-excel; charset=UTF-8')
+            ->header('Content-Disposition', 'attachment; filename="'.$filenameBase.'.xls"');
+    }
+
     private function validateLead(Request $request, ?Lead $lead = null): array
     {
         return $request->validate([
