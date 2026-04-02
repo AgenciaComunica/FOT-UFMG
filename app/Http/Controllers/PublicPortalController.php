@@ -18,6 +18,31 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PublicPortalController extends Controller
 {
+    public function landing(): View
+    {
+        $editalAberto = Edital::query()
+            ->where('publicado', true)
+            ->where('periodo_inscricao_inicio', '<=', now())
+            ->where('periodo_inscricao_fim', '>=', now())
+            ->orderBy('periodo_inscricao_fim')
+            ->first();
+
+        $portalUrl = route('home', ['tab' => 'editais']);
+
+        return view('public.landing', [
+            'mainSiteUrl' => 'https://fisioortotraumaufmg.com.br',
+            'portalUrl' => $portalUrl,
+            'loginUrl' => route('login'),
+            'inscricaoUrl' => $editalAberto
+                ? route('public.inscricao.create', $editalAberto)
+                : $portalUrl,
+            'editalUrl' => $editalAberto
+                ? route('public.editais.download', $editalAberto)
+                : $portalUrl,
+            'temEditalAberto' => (bool) $editalAberto,
+        ]);
+    }
+
     public function index(Request $request): View
     {
         $tab = $request->string('tab')->value();
