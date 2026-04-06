@@ -52,6 +52,11 @@
     padding: 14px 5vw;
   }
   .nav-logo { height: 36px; }
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
   .section-logo {
     height: 44px;
     width: auto;
@@ -99,6 +104,23 @@
     align-items: center;
     gap: 12px;
   }
+  .nav-menu-button {
+    display: none;
+    width: 46px;
+    height: 46px;
+    border: 1px solid rgba(37,101,170,0.18);
+    border-radius: 14px;
+    background: #fff;
+    color: var(--green-dark);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+  }
+  .nav-menu-button svg {
+    width: 22px;
+    height: 22px;
+  }
   .nav-cta-secondary {
     background: transparent;
     color: var(--green-dark);
@@ -113,6 +135,78 @@
   .nav-cta-secondary:hover {
     background: rgba(15, 61, 43, 0.05);
     border-color: rgba(15, 61, 43, 0.26);
+  }
+  .mobile-nav-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.52);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+    z-index: 140;
+  }
+  .mobile-nav {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: min(86vw, 360px);
+    height: 100vh;
+    background: linear-gradient(180deg, #f7f9fc 0%, #edf3fb 100%);
+    box-shadow: -18px 0 42px rgba(15, 23, 42, 0.18);
+    transform: translateX(100%);
+    transition: transform 0.24s ease;
+    z-index: 150;
+    padding: 24px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  body.menu-open .mobile-nav-overlay {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  body.menu-open .mobile-nav {
+    transform: translateX(0);
+  }
+  body.menu-open {
+    overflow: hidden;
+  }
+  .mobile-nav-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .mobile-nav-close {
+    width: 42px;
+    height: 42px;
+    border: 0;
+    border-radius: 12px;
+    background: rgba(37,101,170,0.08);
+    color: var(--green-dark);
+    cursor: pointer;
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+  .mobile-nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .mobile-nav-link {
+    display: block;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: #fff;
+    color: var(--green-dark);
+    text-decoration: none;
+    font-weight: 600;
+    border: 1px solid rgba(37,101,170,0.12);
+  }
+  .mobile-nav-meta {
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    line-height: 1.65;
   }
 
   /* ── HERO ── */
@@ -481,10 +575,123 @@
   footer a:hover { color: var(--green-dark); }
 
   /* ── RESPONSIVE ── */
-  @media (max-width: 680px) {
-    .curso-grid { grid-template-columns: 1fr; }
-    .offer-card { padding: 32px 24px; }
-    nav .nav-links { display: none; }
+  @media (max-width: 860px) {
+    nav {
+      padding: 12px 4.5vw;
+    }
+    .nav-actions {
+      display: none;
+    }
+    .nav-menu-button {
+      display: inline-flex;
+    }
+    .hero {
+      min-height: auto;
+      padding: 46px 4.5vw 64px;
+    }
+    .hero-badge {
+      margin-bottom: 24px;
+      font-size: 0.7rem;
+      padding: 6px 14px;
+    }
+    .hero h1 {
+      font-size: clamp(2.2rem, 12vw, 3.6rem);
+      line-height: 1.04;
+      margin-bottom: 16px;
+    }
+    .hero-sub {
+      font-size: 0.98rem;
+      margin-bottom: 28px;
+    }
+    .video-wrapper {
+      margin-bottom: 28px;
+      border-radius: 18px;
+      aspect-ratio: 16 / 10;
+    }
+    section {
+      padding: 56px 4.5vw;
+    }
+    .trust-bar {
+      padding: 22px 4.5vw;
+      gap: 16px;
+      justify-content: flex-start;
+    }
+    .trust-item {
+      width: 100%;
+      font-size: 0.9rem;
+    }
+    .curso-grid {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+    .curso-copy,
+    .curso-features {
+      gap: 16px;
+    }
+    .feature-item {
+      padding: 18px;
+      border-radius: 16px;
+    }
+    .offer-card {
+      padding: 28px 20px;
+      border-radius: 18px;
+    }
+    .nucleo-item,
+    .faq-q,
+    .faq-a {
+      padding-left: 18px;
+      padding-right: 18px;
+    }
+    .section-title,
+    .section-sub {
+      max-width: none;
+    }
+    footer {
+      padding: 28px 4.5vw 32px;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    footer > div:last-child {
+      flex-direction: column;
+      gap: 10px;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .topbar {
+      padding: 10px 14px;
+      font-size: 0.74rem;
+      line-height: 1.5;
+    }
+    .nav-logo {
+      height: 30px;
+    }
+    .btn-primary,
+    .btn-secondary {
+      width: 100%;
+      padding: 16px 18px;
+      font-size: 0.96rem;
+    }
+    .cta-group {
+      gap: 12px;
+    }
+    .section-label {
+      font-size: 0.68rem;
+      margin-bottom: 10px;
+    }
+    .section-title {
+      font-size: clamp(1.75rem, 9vw, 2.4rem);
+    }
+    .section-sub,
+    .feature-item p,
+    .nucleo-body,
+    .faq-a {
+      font-size: 0.94rem;
+      line-height: 1.65;
+    }
+    .curso-cta-brand .section-logo {
+      max-width: 220px;
+    }
   }
 
   /* ── ANIMATIONS ── */
@@ -513,12 +720,36 @@
 
 <!-- NAV -->
 <nav>
-  <img class="nav-logo" src="{{ asset('images/Logo-FTO.png') }}" alt="FTO UFMG">
+  <div class="nav-brand">
+    <img class="nav-logo" src="{{ asset('images/Logo-FTO.png') }}" alt="FTO UFMG">
+  </div>
   <div class="nav-actions">
     <a href="{{ $editalUrl }}" class="nav-cta-secondary">Acesse o Edital</a>
     <a href="{{ $inscricaoUrl }}" class="nav-cta">Inscreva-se</a>
   </div>
+  <button type="button" class="nav-menu-button" aria-label="Abrir menu" data-menu-open>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+      <path d="M4 7h16M4 12h16M4 17h16"/>
+    </svg>
+  </button>
 </nav>
+
+<div class="mobile-nav-overlay" data-menu-close></div>
+<aside class="mobile-nav" aria-hidden="true" data-mobile-nav>
+  <div class="mobile-nav-top">
+    <img class="nav-logo" src="{{ asset('images/Logo-FTO.png') }}" alt="FTO UFMG">
+    <button type="button" class="mobile-nav-close" aria-label="Fechar menu" data-menu-close>×</button>
+  </div>
+  <div class="mobile-nav-links">
+    <a href="{{ $editalUrl }}" class="mobile-nav-link">Acesse o Edital</a>
+    <a href="{{ $inscricaoUrl }}" class="mobile-nav-link">Inscreva-se</a>
+    <a href="{{ $mainSiteUrl }}" class="mobile-nav-link">Conheça o curso</a>
+    <a href="{{ $loginUrl }}" class="mobile-nav-link">Área Restrita</a>
+  </div>
+  <p class="mobile-nav-meta">
+    Navegação simplificada para o processo seletivo, consulta do edital e inscrição no curso.
+  </p>
+</aside>
 
 <!-- HERO -->
 <section class="hero">
@@ -797,6 +1028,31 @@
     item.querySelector('.nucleo-header').addEventListener('click', () => {
       item.classList.toggle('active');
     });
+  });
+
+  const body = document.body;
+  const menuOpenButton = document.querySelector('[data-menu-open]');
+  const menuCloseButtons = document.querySelectorAll('[data-menu-close]');
+
+  const openMenu = () => body.classList.add('menu-open');
+  const closeMenu = () => body.classList.remove('menu-open');
+
+  if (menuOpenButton) {
+    menuOpenButton.addEventListener('click', openMenu);
+  }
+
+  menuCloseButtons.forEach(button => {
+    button.addEventListener('click', closeMenu);
+  });
+
+  document.querySelectorAll('.mobile-nav-link').forEach(link => {
+    link.addEventListener('click', closeMenu);
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      closeMenu();
+    }
   });
 </script>
 </body>
