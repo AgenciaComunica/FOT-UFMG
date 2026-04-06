@@ -23,6 +23,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     steps:
       - name: Checkout repository
@@ -85,16 +86,22 @@ jobs:
           rsync -av --delete \
             --exclude ".git" \
             --exclude ".github" \
+            --exclude ".vscode" \
+            --exclude "docs" \
             --exclude "node_modules" \
             --exclude "tests" \
             --exclude ".env" \
             --exclude ".env.*" \
             --exclude "vendor" \
             --exclude "public/build" \
+            --exclude "public/hot" \
+            --exclude "storage/app/*" \
             --exclude "storage/logs/*" \
             --exclude "storage/framework/cache/*" \
             --exclude "storage/framework/sessions/*" \
             --exclude "storage/framework/views/*" \
+            --exclude "storage/debugbar/*" \
+            --exclude "storage/tmp/*" \
             --exclude ".phpunit.result.cache" \
             --exclude "phpunit.xml" \
             ./ .deploy/secretaria/
@@ -110,6 +117,17 @@ jobs:
             rsync -av ./public/build/ .deploy/app/build/
           fi
 
+      - name: Inspect deploy package
+        run: |
+          echo "== Secretaria package size =="
+          du -sh .deploy/secretaria
+          echo "== Secretaria file count =="
+          find .deploy/secretaria -type f | wc -l
+          echo "== Public app package size =="
+          du -sh .deploy/app
+          echo "== Public app file count =="
+          find .deploy/app -type f | wc -l
+
       - name: Upload project to ~/secretaria
         uses: locaweb/ftp-deploy@1.0.0
         with:
@@ -119,6 +137,7 @@ jobs:
           localDir: .deploy/secretaria
           remoteDir: secretaria
           forceSsl: false
+          options: "--verbose"
 
       - name: Upload public entrypoint to ~/public_html/app
         uses: locaweb/ftp-deploy@1.0.0
@@ -129,6 +148,7 @@ jobs:
           localDir: .deploy/app
           remoteDir: public_html/app
           forceSsl: false
+          options: "--verbose"
 
       - name: Run production migrations (remote DB)
         if: github.event_name == 'push' || github.event.inputs.run_migrate == 'true'
