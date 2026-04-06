@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pós-Graduação em Fisioterapia em Ortopedia e Trauma – UFMG</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
     --green: #2565aa;
@@ -17,6 +15,8 @@
     --off-white: #ede9e0;
     --text: #1a1a1a;
     --text-muted: #5a5a5a;
+    --font-sans: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    --font-serif: Georgia, "Times New Roman", serif;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,10 +24,11 @@
   html { scroll-behavior: smooth; }
 
   body {
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     background: var(--white);
     color: var(--text);
     overflow-x: hidden;
+    text-rendering: optimizeLegibility;
   }
 
   /* ── TOP BAR ── */
@@ -51,7 +52,12 @@
     display: flex; align-items: center; justify-content: space-between;
     padding: 14px 5vw;
   }
-  .nav-logo { height: 36px; }
+  .nav-logo {
+    display: block;
+    width: min(200px, 42vw);
+    height: auto;
+    object-fit: contain;
+  }
   .nav-brand {
     display: flex;
     align-items: center;
@@ -254,7 +260,7 @@
   }
 
   .hero h1 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-serif);
     font-size: clamp(2rem, 5.5vw, 4.2rem);
     color: #fff;
     line-height: 1.12;
@@ -386,7 +392,7 @@
     margin-bottom: 12px;
   }
   .section-title {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-serif);
     font-size: clamp(1.7rem, 3.5vw, 2.8rem);
     line-height: 1.2;
     margin-bottom: 16px;
@@ -475,7 +481,7 @@
     margin-bottom: 24px;
   }
   .offer-title {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-serif);
     font-size: 1.6rem;
     margin-bottom: 12px;
   }
@@ -664,7 +670,8 @@
       line-height: 1.5;
     }
     .nav-logo {
-      height: 30px;
+      width: min(172px, 46vw);
+      height: auto;
     }
     .btn-primary,
     .btn-secondary {
@@ -721,7 +728,7 @@
 <!-- NAV -->
 <nav>
   <div class="nav-brand">
-    <img class="nav-logo" src="{{ asset('images/Logo-FTO.png') }}" alt="FTO UFMG">
+    <img class="nav-logo" src="{{ asset('images/Logo-FTO.png') }}" alt="FTO UFMG" width="200" height="51" decoding="async">
   </div>
   <div class="nav-actions">
     <a href="{{ $editalUrl }}" class="nav-cta-secondary">Acesse o Edital</a>
@@ -737,7 +744,7 @@
 <div class="mobile-nav-overlay" data-menu-close></div>
 <aside class="mobile-nav" aria-hidden="true" data-mobile-nav>
   <div class="mobile-nav-top">
-    <img class="nav-logo" src="{{ asset('images/Logo-FTO.png') }}" alt="FTO UFMG">
+    <img class="nav-logo" src="{{ asset('images/Logo-FTO.png') }}" alt="FTO UFMG" width="200" height="51" decoding="async">
     <button type="button" class="mobile-nav-close" aria-label="Fechar menu" data-menu-close>×</button>
   </div>
   <div class="mobile-nav-links">
@@ -871,7 +878,7 @@
     </div>
   </div>
   <div class="curso-cta-brand">
-    <img class="section-logo" src="{{ asset('images/Logo-FTO.png') }}" alt="FTO UFMG">
+    <img class="section-logo" src="{{ asset('images/Logo-FTO.png') }}" alt="FTO UFMG" width="200" height="51" decoding="async">
     <a href="{{ $inscricaoUrl }}" class="btn-primary course-signup-btn" style="width: min(100%, 320px);">Faça sua inscrição</a>
   </div>
 </section>
@@ -943,7 +950,7 @@
   </div>
 
   <div class="curso-cta-brand">
-    <img class="section-logo" src="{{ asset('images/Logo-FTO.png') }}" alt="FTO UFMG">
+    <img class="section-logo" src="{{ asset('images/Logo-FTO.png') }}" alt="FTO UFMG" width="200" height="51" decoding="async">
     <a href="{{ $inscricaoUrl }}" class="btn-primary course-signup-btn" style="width: min(100%, 320px);">Faça sua inscrição</a>
   </div>
 </section>
@@ -997,7 +1004,7 @@
 <!-- FOOTER -->
 <footer>
   <div style="display:flex; align-items:center; gap:14px;">
-    <img class="section-logo" src="{{ asset('images/Logo-FTO.png') }}" alt="FTO UFMG" style="height:40px;">
+    <img class="section-logo" src="{{ asset('images/Logo-FTO.png') }}" alt="FTO UFMG" width="200" height="51" decoding="async" style="height:40px;">
     <span>© 2026 FTO UFMG — Fisioterapia em Ortopedia e Trauma</span>
   </div>
   <div style="display:flex; gap:20px;">
