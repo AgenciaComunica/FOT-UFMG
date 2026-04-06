@@ -15,6 +15,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PublicPortalController::class, 'index'])->name('home');
+Route::get('/landing', [PublicPortalController::class, 'landing'])->name('public.landing');
 Route::get('/newsletter/iframe', [PublicLeadController::class, 'iframe'])->name('public.leads.iframe');
 Route::post('/newsletter', [PublicLeadController::class, 'store'])
     ->middleware('throttle:8,60')
