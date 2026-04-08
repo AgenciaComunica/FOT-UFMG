@@ -6,9 +6,13 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="deleteEditalModal()">
+    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="editaisIndexModal()">
         @if (session('status'))
             <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{{ session('status') }}</div>
+        @endif
+
+        @if (session('warning'))
+            <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{{ session('warning') }}</div>
         @endif
 
         @if ($errors->has('edital'))
@@ -111,8 +115,9 @@
             </form>
 
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <a
-                    href="{{ route('admin.editais.create') }}"
+                <button
+                    type="button"
+                    @click="{{ $encerradosNaoArquivados->isNotEmpty() ? 'openCreateBlockedModal()' : "window.location = '".route('admin.editais.create')."'" }}"
                     class="group flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-dashed border-blue-300 bg-blue-50/60 p-5 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-50"
                 >
                     <span class="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition group-hover:scale-105">
@@ -121,8 +126,10 @@
                         </svg>
                     </span>
                     <p class="text-base font-semibold text-blue-800">Adicionar Edital</p>
-                    <p class="mt-1 text-sm text-blue-700">Clique para criar um novo edital.</p>
-                </a>
+                    <p class="mt-1 text-sm text-blue-700">
+                        {{ $encerradosNaoArquivados->isNotEmpty() ? 'Arquive os editais encerrados antes de criar um novo.' : 'Clique para criar um novo edital.' }}
+                    </p>
+                </button>
 
                 @if ($editais->isEmpty())
                     <div class="flex min-h-[280px] items-center justify-center rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600 shadow-sm sm:col-span-1 xl:col-span-2">
@@ -137,6 +144,7 @@
                                 'ABERTO' => 'status-homologada',
                                 'RASCUNHO' => 'status-indeferida',
                                 'ENCERRADO' => 'bg-slate-200 text-slate-700',
+                                'ARQUIVADO' => 'bg-violet-100 text-violet-700',
                                 default => 'status-recebida',
                             };
                         @endphp
@@ -189,22 +197,26 @@
                                 @csrf
                                 <div class="flex items-center justify-between gap-3">
                                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Publicado</p>
-                                    <label class="relative inline-flex cursor-pointer items-center">
-                                        <input
-                                            type="checkbox"
-                                            name="publicado"
-                                            value="1"
-                                            class="peer sr-only"
-                                            @checked($edital->publicado)
-                                            onchange="this.form.submit()"
-                                        >
-                                        <div class="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-emerald-500"></div>
-                                        <span class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-5"></span>
-                                    </label>
+                                    @if ($edital->isArquivado())
+                                        <span class="text-xs font-semibold text-violet-700">Arquivado</span>
+                                    @else
+                                        <label class="relative inline-flex cursor-pointer items-center">
+                                            <input
+                                                type="checkbox"
+                                                name="publicado"
+                                                value="1"
+                                                class="peer sr-only"
+                                                @checked($edital->publicado)
+                                                onchange="if (this.checked && {{ $publishedEditaisCount }} >= 2 && !confirm('Você já possui 2 editais publicados. Fique atento ao espaço disponível do disco, pois se o limite for ultrapassado novas inscrições podem ser bloqueadas. Deseja continuar?')) { this.checked = false; return; } this.form.submit();"
+                                            >
+                                            <div class="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-emerald-500"></div>
+                                            <span class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-5"></span>
+                                        </label>
+                                    @endif
                                 </div>
                             </form>
 
-                            <div class="mt-5 flex items-center gap-2 text-sm">
+                            <div class="mt-5 flex flex-wrap items-center gap-2 text-sm">
                                 <a
                                     href="{{ route('admin.inscricoes.index', ['edital_id' => $edital->id]) }}"
                                     class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 transition hover:bg-blue-100"
@@ -224,6 +236,22 @@
                                     </svg>
                                     Editar
                                 </a>
+                                @if ($edital->status === 'ENCERRADO')
+                                    <form method="POST" id="archive-edital-{{ $edital->id }}" action="{{ route('admin.editais.archive', $edital) }}">
+                                        @csrf
+                                        <button
+                                            class="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800 transition hover:bg-amber-100"
+                                            type="button"
+                                            @click="openArchiveModal({{ $edital->id }}, @js($edital->titulo), {{ (int) $edital->inscricoes_count }})"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                <path d="M3 3.75A1.75 1.75 0 014.75 2h10.5A1.75 1.75 0 0117 3.75v2.5a.75.75 0 01-1.5 0v-2.5a.25.25 0 00-.25-.25H4.75a.25.25 0 00-.25.25v2.5a.75.75 0 01-1.5 0v-2.5z" />
+                                                <path d="M4.22 8.22A.75.75 0 015.28 8l4.72 4.72L14.72 8a.75.75 0 111.06 1.06l-5.25 5.25a.75.75 0 01-1.06 0L4.22 9.06a.75.75 0 010-1.06z" />
+                                            </svg>
+                                            Arquivar Edital
+                                        </button>
+                                    </form>
+                                @endif
                                 <form method="POST" id="delete-edital-{{ $edital->id }}" action="{{ route('admin.editais.destroy', $edital) }}">
                                     @csrf
                                     @method('DELETE')
@@ -282,7 +310,30 @@
         </section>
 
         <div
-            x-show="open"
+            x-show="createBlockedOpen"
+            x-transition
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4"
+            style="display: none;"
+        >
+            <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
+                <h4 class="text-base font-semibold text-slate-900">Novo edital bloqueado</h4>
+                <p class="mt-2 text-sm text-slate-600">Existe edital encerrado que ainda não foi arquivado. Arquive primeiro antes de abrir um novo edital.</p>
+                <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    <p class="font-semibold">Editais pendentes de arquivamento:</p>
+                    <ul class="mt-2 list-disc space-y-1 pl-5">
+                        @foreach ($encerradosNaoArquivados as $editalPendente)
+                            <li>{{ $editalPendente->titulo }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+                <div class="mt-4 flex justify-end">
+                    <button type="button" @click="createBlockedOpen = false" class="btn-primary">Entendi</button>
+                </div>
+            </div>
+        </div>
+
+        <div
+            x-show="deleteOpen"
             x-transition
             class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4"
             style="display: none;"
@@ -316,6 +367,26 @@
                     >
                         Excluir
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <div
+            x-show="archiveOpen"
+            x-transition
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4"
+            style="display: none;"
+        >
+            <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
+                <h4 class="text-base font-semibold text-slate-900">Arquivar edital</h4>
+                <p class="mt-2 text-sm text-slate-600">Este edital será arquivado. Os documentos enviados pelos candidatos serão removidos do disco para liberar espaço, mantendo os metadados das inscrições.</p>
+                <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    <p><span class="font-semibold">Edital:</span> <span x-text="archiveTitle"></span></p>
+                    <p class="mt-1"><span class="font-semibold">Inscrições vinculadas:</span> <span x-text="archiveInscricoesCount"></span></p>
+                </div>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button type="button" @click="closeArchiveModal()" class="btn-muted">Cancelar</button>
+                    <button type="button" @click="confirmArchive()" class="inline-flex items-center rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700">Arquivar</button>
                 </div>
             </div>
         </div>
@@ -367,26 +438,46 @@
             };
         }
 
-        function deleteEditalModal() {
+        function editaisIndexModal() {
             return {
-                open: false,
+                createBlockedOpen: false,
+                deleteOpen: false,
                 editalId: null,
                 expectedName: '',
                 inscricoesCount: 0,
                 typedName: '',
+                archiveOpen: false,
+                archiveId: null,
+                archiveTitle: '',
+                archiveInscricoesCount: 0,
+                openCreateBlockedModal() {
+                    this.createBlockedOpen = true;
+                },
                 openDeleteModal(id, titulo, inscricoesCount = 0) {
-                    this.open = true;
+                    this.deleteOpen = true;
                     this.editalId = id;
                     this.expectedName = titulo ?? '';
                     this.inscricoesCount = Number(inscricoesCount || 0);
                     this.typedName = '';
                 },
                 closeModal() {
-                    this.open = false;
+                    this.deleteOpen = false;
                     this.editalId = null;
                     this.expectedName = '';
                     this.inscricoesCount = 0;
                     this.typedName = '';
+                },
+                openArchiveModal(id, titulo, inscricoesCount = 0) {
+                    this.archiveOpen = true;
+                    this.archiveId = id;
+                    this.archiveTitle = titulo ?? '';
+                    this.archiveInscricoesCount = Number(inscricoesCount || 0);
+                },
+                closeArchiveModal() {
+                    this.archiveOpen = false;
+                    this.archiveId = null;
+                    this.archiveTitle = '';
+                    this.archiveInscricoesCount = 0;
                 },
                 confirmDelete() {
                     if (this.typedName.trim() !== this.expectedName.trim() || !this.editalId) {
@@ -394,6 +485,16 @@
                     }
 
                     const form = document.getElementById(`delete-edital-${this.editalId}`);
+                    if (form) {
+                        form.submit();
+                    }
+                },
+                confirmArchive() {
+                    if (!this.archiveId) {
+                        return;
+                    }
+
+                    const form = document.getElementById(`archive-edital-${this.archiveId}`);
                     if (form) {
                         form.submit();
                     }

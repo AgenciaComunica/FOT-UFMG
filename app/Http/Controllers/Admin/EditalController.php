@@ -30,18 +30,23 @@ class EditalController extends Controller
         if (! in_array($perPageRaw, $perPageOptions, true)) {
             $perPageRaw = '10';
         }
-        $statusesPermitidos = ['RASCUNHO', 'AGUARDANDO', 'ABERTO', 'ENCERRADO'];
+        $statusesPermitidos = ['RASCUNHO', 'AGUARDANDO', 'ABERTO', 'ENCERRADO', 'ARQUIVADO'];
         if (! in_array($status, $statusesPermitidos, true)) {
             $status = '';
         }
 
+        $encerradosNaoArquivados = $this->encerradosNaoArquivadosQuery()
+            ->orderByDesc('periodo_inscricao_fim')
+            ->get(['id', 'titulo']);
+
         $editalPadraoGraficos = Edital::query()
             ->where('publicado', true)
+            ->whereNull('archived_at')
             ->where('periodo_inscricao_inicio', '<=', now())
             ->where('periodo_inscricao_fim', '>=', now())
             ->orderByDesc('periodo_inscricao_inicio')
             ->first()
-            ?? Edital::query()->latest('periodo_inscricao_inicio')->first();
+            ?? Edital::query()->whereNull('archived_at')->latest('periodo_inscricao_inicio')->first();
 
         $graficoEditalId = (int) $request->integer('grafico_edital_id', $editalPadraoGraficos?->id ?? 0);
         $graficoEdital = Edital::query()->find($graficoEditalId) ?? $editalPadraoGraficos;
@@ -85,13 +90,17 @@ class EditalController extends Controller
                 $now = now();
 
                 return match ($status) {
-                    'RASCUNHO' => $builder->where('publicado', false),
+                    'ARQUIVADO' => $builder->whereNotNull('archived_at'),
+                    'RASCUNHO' => $builder->where('publicado', false)->whereNull('archived_at'),
                     'AGUARDANDO' => $builder->where('publicado', true)
+                        ->whereNull('archived_at')
                         ->where('periodo_inscricao_inicio', '>', $now),
                     'ABERTO' => $builder->where('publicado', true)
+                        ->whereNull('archived_at')
                         ->where('periodo_inscricao_inicio', '<=', $now)
                         ->where('periodo_inscricao_fim', '>=', $now),
                     'ENCERRADO' => $builder->where('publicado', true)
+                        ->whereNull('archived_at')
                         ->where('periodo_inscricao_fim', '<', $now),
                     default => $builder,
                 };
@@ -232,6 +241,8 @@ class EditalController extends Controller
                 (int) ($statusCountMap['INDEFERIDA'] ?? 0),
                 (int) ($statusCountMap['RECEBIDA'] ?? 0),
             ],
+            'encerradosNaoArquivados' => $encerradosNaoArquivados,
+            'publishedEditaisCount' => $this->publishedEditaisCount(),
         ]);
     }
 
@@ -250,8 +261,14 @@ class EditalController extends Controller
         return $endOfDay ? $date->endOfDay() : $date->startOfDay();
     }
 
-    public function create(): View
+    public function create(): View|RedirectResponse
     {
+        if ($mensagem = $this->mensagemBloqueioPublicacao()) {
+            return redirect()
+                ->route('admin.editais.index')
+                ->withErrors(['edital' => $mensagem]);
+        }
+
         return view('admin.editais.form', [
             'edital' => new Edital(),
             'docentesDisponiveis' => User::query()
@@ -262,6 +279,7 @@ class EditalController extends Controller
             'documentosInitial' => old('documentos_requeridos', []),
             'formAction' => route('admin.editais.store'),
             'method' => 'POST',
+            'publishedEditaisCount' => $this->publishedEditaisCount(),
         ]);
     }
 
@@ -278,6 +296,10 @@ class EditalController extends Controller
         $gotoNewDocente = $request->boolean('goto_new_docente');
         $inicio = $this->resolveDateTimeForPersist($data['periodo_inscricao_inicio'] ?? null, false);
         $fim = $this->resolveDateTimeForPersist($data['periodo_inscricao_fim'] ?? null, true);
+
+        if ($publicado && ($mensagem = $this->mensagemBloqueioPublicacao())) {
+            return back()->withInput()->withErrors(['edital' => $mensagem]);
+        }
 
         $edital = Edital::create([
             'titulo' => $this->resolveTituloForPersist($data['titulo'] ?? null),
@@ -319,9 +341,15 @@ class EditalController extends Controller
                 ->with('status', 'Rascunho salvo. Cadastre o novo docente para voltar ao edital.');
         }
 
-        return redirect()
+        $redirect = redirect()
             ->route('admin.editais.index')
             ->with('status', $publicado ? 'Edital criado com sucesso.' : 'Rascunho salvo com sucesso.');
+
+        if ($publicado && $this->publishedEditaisCount() >= 2) {
+            $redirect->with('warning', 'Você já possui 2 ou mais editais publicados. Fique atento ao espaço disponível em disco, pois se o limite for ultrapassado novas inscrições podem ser bloqueadas.');
+        }
+
+        return $redirect;
     }
 
     public function edit(Edital $edital): View
@@ -354,6 +382,7 @@ class EditalController extends Controller
                 ->all()),
             'formAction' => route('admin.editais.update', $edital),
             'method' => 'PUT',
+            'publishedEditaisCount' => $this->publishedEditaisCount($edital->id),
         ]);
     }
 
@@ -371,6 +400,10 @@ class EditalController extends Controller
         $gotoNewDocente = $request->boolean('goto_new_docente');
         $inicio = $this->resolveDateTimeForPersist($data['periodo_inscricao_inicio'] ?? null, false, $edital->periodo_inscricao_inicio);
         $fim = $this->resolveDateTimeForPersist($data['periodo_inscricao_fim'] ?? null, true, $edital->periodo_inscricao_fim);
+
+        if ($publicado && ($mensagem = $this->mensagemBloqueioPublicacao($edital->id))) {
+            return back()->withInput()->withErrors(['edital' => $mensagem]);
+        }
 
         $edital->update([
             'titulo' => $this->resolveTituloForPersist($data['titulo'] ?? null, $edital->titulo),
@@ -416,9 +449,15 @@ class EditalController extends Controller
                 ->with('status', 'Rascunho salvo. Cadastre o novo docente para voltar ao edital.');
         }
 
-        return redirect()
+        $redirect = redirect()
             ->route('admin.editais.index')
             ->with('status', $publicado ? 'Edital atualizado com sucesso.' : 'Rascunho salvo com sucesso.');
+
+        if ($publicado && $this->publishedEditaisCount($edital->id) >= 2) {
+            $redirect->with('warning', 'Você já possui 2 ou mais editais publicados. Fique atento ao espaço disponível em disco, pois se o limite for ultrapassado novas inscrições podem ser bloqueadas.');
+        }
+
+        return $redirect;
     }
 
     public function destroy(Edital $edital): RedirectResponse
@@ -476,7 +515,17 @@ class EditalController extends Controller
         $publicado = $request->boolean('publicado');
         $wasPublicado = (bool) $edital->publicado;
 
+        if ($edital->isArquivado()) {
+            return back()->withErrors([
+                'edital' => 'Editais arquivados não podem ser republicados.',
+            ]);
+        }
+
         if ($publicado) {
+            if ($mensagem = $this->mensagemBloqueioPublicacao($edital->id)) {
+                return back()->withErrors(['edital' => $mensagem]);
+            }
+
             $missing = $this->missingCamposPublicacao($edital);
             if ($missing !== []) {
                 return back()->withErrors([
@@ -492,7 +541,64 @@ class EditalController extends Controller
             $this->notificarDocentesBancaPublicacao($edital);
         }
 
-        return back()->with('status', 'Status do edital atualizado com sucesso.');
+        $redirect = back()->with('status', 'Status do edital atualizado com sucesso.');
+
+        if ($publicado && $this->publishedEditaisCount($edital->id) >= 2) {
+            $redirect->with('warning', 'Você já possui 2 ou mais editais publicados. Fique atento ao espaço disponível em disco, pois se o limite for ultrapassado novas inscrições podem ser bloqueadas.');
+        }
+
+        return $redirect;
+    }
+
+    public function archive(Edital $edital): RedirectResponse
+    {
+        if ($edital->isArquivado()) {
+            return back()->with('status', 'Este edital já está arquivado.');
+        }
+
+        if (! $edital->isEncerrado()) {
+            return back()->withErrors([
+                'edital' => 'Apenas editais encerrados podem ser arquivados.',
+            ]);
+        }
+
+        DB::transaction(function () use ($edital): void {
+            $edital->loadMissing('inscricoes.documentos');
+
+            foreach ($edital->inscricoes as $inscricao) {
+                foreach ($inscricao->documentos as $doc) {
+                    if (filled($doc->arquivo_path) && Storage::disk('local')->exists($doc->arquivo_path)) {
+                        Storage::disk('local')->delete($doc->arquivo_path);
+                    }
+
+                    $doc->forceFill([
+                        'arquivo_path' => '',
+                    ])->save();
+                }
+
+                $directory = 'inscricoes/'.$inscricao->id;
+                if (Storage::disk('local')->exists($directory)) {
+                    Storage::disk('local')->deleteDirectory($directory);
+                }
+            }
+
+            if (filled($edital->arquivo_path) && Storage::disk('local')->exists($edital->arquivo_path)) {
+                Storage::disk('local')->delete($edital->arquivo_path);
+            }
+
+            $editalDirectory = 'editais/'.$edital->id;
+            if (Storage::disk('local')->exists($editalDirectory)) {
+                Storage::disk('local')->deleteDirectory($editalDirectory);
+            }
+
+            $edital->forceFill([
+                'arquivo_path' => null,
+                'archived_at' => now(),
+                'archived_by' => auth()->id(),
+            ])->save();
+        });
+
+        return back()->with('status', 'Edital arquivado com sucesso. Os arquivos enviados pelos candidatos foram removidos do disco e os metadados foram preservados.');
     }
 
     public function downloadArquivo(Edital $edital): StreamedResponse
@@ -672,5 +778,38 @@ class EditalController extends Controller
             } catch (\Throwable) {
             }
         }
+    }
+
+    private function encerradosNaoArquivadosQuery(?int $ignoreId = null)
+    {
+        return Edital::query()
+            ->where('publicado', true)
+            ->whereNull('archived_at')
+            ->where('periodo_inscricao_fim', '<', now())
+            ->when($ignoreId, fn ($query) => $query->whereKeyNot($ignoreId));
+    }
+
+    private function mensagemBloqueioPublicacao(?int $ignoreId = null): ?string
+    {
+        $titulos = $this->encerradosNaoArquivadosQuery($ignoreId)
+            ->orderByDesc('periodo_inscricao_fim')
+            ->pluck('titulo')
+            ->filter()
+            ->values();
+
+        if ($titulos->isEmpty()) {
+            return null;
+        }
+
+        return 'Existe edital encerrado que ainda não foi arquivado. Arquive primeiro antes de abrir ou publicar um novo edital: '.$titulos->implode(', ').'.';
+    }
+
+    private function publishedEditaisCount(?int $ignoreId = null): int
+    {
+        return Edital::query()
+            ->where('publicado', true)
+            ->whereNull('archived_at')
+            ->when($ignoreId, fn ($query) => $query->whereKeyNot($ignoreId))
+            ->count();
     }
 }

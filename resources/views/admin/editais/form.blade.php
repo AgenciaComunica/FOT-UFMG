@@ -20,6 +20,12 @@
             </div>
         @endif
 
+        @if (session('warning'))
+            <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                {{ session('warning') }}
+            </div>
+        @endif
+
         @php
             $publicadoInicial = (bool) old('publicado', $edital->exists ? $edital->publicado : false);
             $isEdit = $edital->exists;
@@ -28,9 +34,10 @@
             $notaFixaInicial = old('nota_corte_fixa', $edital->nota_corte_fixa);
             $offsetInicial = old('nota_corte_offset', $edital->nota_corte_offset ?? 0);
             $numeroVagasInicial = old('numero_vagas', $edital->numero_vagas);
+            $publishedEditaisCount = (int) ($publishedEditaisCount ?? 0);
         @endphp
 
-        <form method="POST" action="{{ $formAction }}" enctype="multipart/form-data" class="panel-card space-y-6" x-data="editalDocsForm(@js($documentosInitial), @js($bancaDocentesInitial), @js($docentesDisponiveis), @js($criterioNotaInicial), @js($notaFixaInicial), @js($offsetInicial), @js($numeroVagasInicial), {{ $publicadoInicial ? 'true' : 'false' }}, {{ $isEdit ? 'true' : 'false' }}, {{ $hasArquivoAtual ? 'true' : 'false' }}, @js($edital->titulo ?? ''), {{ (int) ($edital->inscricoes_count ?? 0) }})">
+        <form method="POST" action="{{ $formAction }}" enctype="multipart/form-data" class="panel-card space-y-6" x-data="editalDocsForm(@js($documentosInitial), @js($bancaDocentesInitial), @js($docentesDisponiveis), @js($criterioNotaInicial), @js($notaFixaInicial), @js($offsetInicial), @js($numeroVagasInicial), {{ $publicadoInicial ? 'true' : 'false' }}, {{ $isEdit ? 'true' : 'false' }}, {{ $hasArquivoAtual ? 'true' : 'false' }}, @js($edital->titulo ?? ''), {{ (int) ($edital->inscricoes_count ?? 0) }}, {{ $publishedEditaisCount }})">
             @csrf
             @if ($method !== 'POST')
                 @method($method)
@@ -45,14 +52,25 @@
                         <p class="text-xs text-slate-500">Controle se o edital fica disponível para inscrição pública.</p>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="text-xs font-semibold" :class="publicado ? 'text-emerald-700' : 'text-slate-500'" x-text="publicado ? 'Publicado' : 'Rascunho'"></span>
-                        <button type="button" @click="togglePublicado()" class="relative h-6 w-12 rounded-full transition" :class="publicado ? 'bg-emerald-500' : 'bg-slate-300'">
-                            <span class="absolute top-0.5 h-5 w-5 rounded-full bg-white transition" :class="publicado ? 'left-6' : 'left-0.5'"></span>
-                        </button>
-                        <input type="hidden" name="publicado" :value="publicado ? 1 : 0">
+                        @if ($edital->isArquivado())
+                            <span class="text-xs font-semibold text-violet-700">Arquivado</span>
+                            <input type="hidden" name="publicado" value="1">
+                        @else
+                            <span class="text-xs font-semibold" :class="publicado ? 'text-emerald-700' : 'text-slate-500'" x-text="publicado ? 'Publicado' : 'Rascunho'"></span>
+                            <button type="button" @click="togglePublicado()" class="relative h-6 w-12 rounded-full transition" :class="publicado ? 'bg-emerald-500' : 'bg-slate-300'">
+                                <span class="absolute top-0.5 h-5 w-5 rounded-full bg-white transition" :class="publicado ? 'left-6' : 'left-0.5'"></span>
+                            </button>
+                            <input type="hidden" name="publicado" :value="publicado ? 1 : 0">
+                        @endif
                     </div>
                 </div>
             </div>
+
+            @if ($publishedEditaisCount >= 2)
+                <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Você já possui {{ $publishedEditaisCount }} editais publicados. Fique atento ao espaço disponível do disco, pois se o limite for ultrapassado novas inscrições podem ser bloqueadas.
+                </div>
+            @endif
 
             <div class="grid gap-4 md:grid-cols-2">
                 <div class="md:col-span-2">
@@ -335,6 +353,22 @@
                 </div>
             </div>
 
+            <div
+                x-show="publishRiskModalOpen"
+                x-transition
+                class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4"
+                style="display: none;"
+            >
+                <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+                    <h4 class="text-base font-semibold text-slate-900">Atenção ao espaço em disco</h4>
+                    <p class="mt-2 text-sm text-slate-600">Você já possui <span class="font-semibold" x-text="publishedEditaisCount"></span> editais publicados. Fique atento ao espaço disponível do disco, pois se o limite for ultrapassado as inscrições não poderão ser feitas.</p>
+                    <div class="mt-4 flex justify-end gap-2">
+                        <button type="button" @click="publishRiskModalOpen = false" class="btn-muted">Cancelar</button>
+                        <button type="button" @click="confirmPublishAfterRisk()" class="btn-primary">Deseja continuar?</button>
+                    </div>
+                </div>
+            </div>
+
             @if ($edital->exists)
                 <div
                     x-show="confirmDeleteOpen"
@@ -386,7 +420,7 @@
     </div>
 
     <script>
-        function editalDocsForm(initialDocs, bancaDocentesInitial, docentesDisponiveis, criterioNotaInicial, notaFixaInicial, offsetInicial, numeroVagasInicial, publicadoInicial, isEdit, hasArquivoPersistido, deleteExpectedName, deleteInscricoesCount) {
+        function editalDocsForm(initialDocs, bancaDocentesInitial, docentesDisponiveis, criterioNotaInicial, notaFixaInicial, offsetInicial, numeroVagasInicial, publicadoInicial, isEdit, hasArquivoPersistido, deleteExpectedName, deleteInscricoesCount, publishedEditaisCount) {
             const normalized = (Array.isArray(initialDocs) ? initialDocs : []).map((doc, idx) => ({
                 key: `doc-${Date.now()}-${idx}`,
                 tipo: doc?.tipo ?? '',
@@ -429,6 +463,9 @@
                 deleteNameConfirm: '',
                 publishBlockModalOpen: false,
                 publishMissingFields: [],
+                publishRiskModalOpen: false,
+                publishedEditaisCount: Number(publishedEditaisCount || 0),
+                pendingPublishSubmit: false,
                 field(index, name) {
                     return `documentos_requeridos[${index}][${name}]`;
                 },
@@ -521,6 +558,12 @@
                         return;
                     }
 
+                    if (!this.publicado && this.publishedEditaisCount >= 2) {
+                        this.pendingPublishSubmit = false;
+                        this.publishRiskModalOpen = true;
+                        return;
+                    }
+
                     this.publicado = true;
                 },
                 primaryActionLabel() {
@@ -541,9 +584,27 @@
                             return;
                         }
 
+                        if (this.publishedEditaisCount >= 2) {
+                            this.pendingPublishSubmit = true;
+                            this.publishRiskModalOpen = true;
+                            return;
+                        }
+
                         this.publicado = true;
                     }
 
+                    this.$nextTick(() => {
+                        this.$root.submit();
+                    });
+                },
+                confirmPublishAfterRisk() {
+                    this.publishRiskModalOpen = false;
+                    this.publicado = true;
+                    if (!this.pendingPublishSubmit) {
+                        return;
+                    }
+
+                    this.pendingPublishSubmit = false;
                     this.$nextTick(() => {
                         this.$root.submit();
                     });
