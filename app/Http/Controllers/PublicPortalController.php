@@ -22,6 +22,7 @@ class PublicPortalController extends Controller
     {
         $editalAberto = Edital::query()
             ->where('publicado', true)
+            ->whereNull('archived_at')
             ->where('periodo_inscricao_inicio', '<=', now())
             ->where('periodo_inscricao_fim', '>=', now())
             ->orderBy('periodo_inscricao_fim')
@@ -63,6 +64,7 @@ class PublicPortalController extends Controller
 
         $baseQuery = Edital::query()
             ->where('publicado', true)
+            ->whereNull('archived_at')
             ->when($q !== '', function ($builder) use ($q) {
                 $builder->where(function ($nested) use ($q) {
                     $nested
@@ -291,6 +293,7 @@ class PublicPortalController extends Controller
     {
         abort_unless(
             $edital->publicado
+            && ! $edital->isArquivado()
             && $edital->hasArquivoEdital()
             && Storage::disk('local')->exists($edital->arquivo_path),
             404

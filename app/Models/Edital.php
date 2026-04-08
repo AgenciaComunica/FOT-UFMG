@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Schema;
@@ -35,6 +36,8 @@ class Edital extends Model
         'arquivo_original_name',
         'arquivo_mime',
         'arquivo_size',
+        'archived_at',
+        'archived_by',
     ];
 
     protected function casts(): array
@@ -48,6 +51,7 @@ class Edital extends Model
             'periodo_inscricao_fim' => 'datetime',
             'inscricoes_encerramento_notificado_at' => 'datetime',
             'arquivo_size' => 'integer',
+            'archived_at' => 'datetime',
         ];
     }
 
@@ -77,6 +81,10 @@ class Edital extends Model
 
     public function getStatusAttribute(): string
     {
+        if ($this->archived_at) {
+            return 'ARQUIVADO';
+        }
+
         if (! $this->publicado) {
             return 'RASCUNHO';
         }
@@ -99,9 +107,24 @@ class Edital extends Model
         return $this->status === 'ABERTO';
     }
 
+    public function isEncerrado(): bool
+    {
+        return $this->status === 'ENCERRADO';
+    }
+
+    public function isArquivado(): bool
+    {
+        return $this->status === 'ARQUIVADO';
+    }
+
     public function hasArquivoEdital(): bool
     {
         return filled($this->arquivo_path);
+    }
+
+    public function archivedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'archived_by');
     }
 
     private static function hasPivotAprovadorColumn(): bool
