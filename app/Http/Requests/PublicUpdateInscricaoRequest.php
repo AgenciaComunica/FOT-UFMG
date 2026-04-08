@@ -31,10 +31,14 @@ class PublicUpdateInscricaoRequest extends FormRequest
 
     public function messages(): array
     {
+        $maxPdfKb = (int) config('inscricoes.max_pdf_kb', 10_240);
+        $maxPdfMb = number_format($maxPdfKb / 1024, 0);
+
         return [
             'motivo_edicao.required' => 'Informe o motivo da edição para continuar.',
             'motivo_edicao.min' => 'Descreva o motivo da edição com pelo menos 5 caracteres.',
             'motivo_edicao.max' => 'O motivo da edição pode ter no máximo 1000 caracteres.',
+            'documentos.*.max' => "O arquivo enviado ultrapassa o tamanho máximo permitido de {$maxPdfMb} MB por documento.",
         ];
     }
 

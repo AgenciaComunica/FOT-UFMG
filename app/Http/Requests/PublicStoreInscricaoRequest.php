@@ -115,9 +115,13 @@ class PublicStoreInscricaoRequest extends FormRequest
 
     public function messages(): array
     {
+        $maxPdfKb = (int) config('inscricoes.max_pdf_kb', 10_240);
+        $maxPdfMb = number_format($maxPdfKb / 1024, 0);
+
         return [
             'email.unique' => 'Este e-mail já possui uma inscrição cadastrada. Em caso de erro, entre em contato com a secretaria.',
             'cpf.unique' => 'Este CPF já possui uma inscrição cadastrada. Em caso de erro, entre em contato com a secretaria.',
+            'documentos.*.max' => "O arquivo enviado ultrapassa o tamanho máximo permitido de {$maxPdfMb} MB por documento.",
         ];
     }
 }
