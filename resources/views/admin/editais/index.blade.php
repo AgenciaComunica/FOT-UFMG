@@ -316,7 +316,7 @@
             style="display: none;"
         >
             <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
-                <h4 class="text-base font-semibold text-slate-900">Novo edital bloqueado</h4>
+                <h4 class="text-base font-semibold text-slate-900">Ação Pendente</h4>
                 <p class="mt-2 text-sm text-slate-600">Existe edital encerrado que ainda não foi arquivado. Arquive primeiro antes de abrir um novo edital.</p>
                 <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                     <p class="font-semibold">Editais pendentes de arquivamento:</p>
@@ -326,8 +326,9 @@
                         @endforeach
                     </ul>
                 </div>
-                <div class="mt-4 flex justify-end">
-                    <button type="button" @click="createBlockedOpen = false" class="btn-primary">Entendi</button>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button type="button" @click="createBlockedOpen = false" class="btn-muted">Cancelar</button>
+                    <button type="button" @click="openFirstPendingArchive()" class="inline-flex items-center rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700">Arquivar Edital</button>
                 </div>
             </div>
         </div>
@@ -440,6 +441,11 @@
 
         function editaisIndexModal() {
             return {
+                pendingArchivedEditais: @js($encerradosNaoArquivados->map(fn ($edital) => [
+                    'id' => $edital->id,
+                    'titulo' => $edital->titulo,
+                    'inscricoes_count' => (int) ($edital->inscricoes_count ?? 0),
+                ])->values()),
                 createBlockedOpen: false,
                 deleteOpen: false,
                 editalId: null,
@@ -452,6 +458,16 @@
                 archiveInscricoesCount: 0,
                 openCreateBlockedModal() {
                     this.createBlockedOpen = true;
+                },
+                openFirstPendingArchive() {
+                    const pending = Array.isArray(this.pendingArchivedEditais) ? this.pendingArchivedEditais[0] : null;
+                    if (!pending) {
+                        this.createBlockedOpen = false;
+                        return;
+                    }
+
+                    this.createBlockedOpen = false;
+                    this.openArchiveModal(pending.id, pending.titulo, pending.inscricoes_count ?? 0);
                 },
                 openDeleteModal(id, titulo, inscricoesCount = 0) {
                     this.deleteOpen = true;

@@ -36,6 +36,7 @@ class EditalController extends Controller
         }
 
         $encerradosNaoArquivados = $this->encerradosNaoArquivadosQuery()
+            ->withCount('inscricoes')
             ->orderByDesc('periodo_inscricao_fim')
             ->get(['id', 'titulo']);
 
