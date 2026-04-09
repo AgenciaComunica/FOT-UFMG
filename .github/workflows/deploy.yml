@@ -117,7 +117,9 @@ jobs:
 
           rsync -av --delete --exclude "build" ./public/ .deploy/app/
 
-          rsync -av ./vendor/ .deploy/secretaria/vendor/
+          if [ "${{ steps.changes.outputs.composer }}" = "true" ] || [ "${{ github.event.inputs.full_deploy }}" = "true" ]; then
+            rsync -av ./vendor/ .deploy/secretaria/vendor/
+          fi
 
           if [ "${{ steps.changes.outputs.frontend }}" = "true" ] || [ "${{ github.event.inputs.full_deploy }}" = "true" ]; then
             rsync -av ./public/build/ .deploy/secretaria/public/build/
@@ -160,7 +162,29 @@ jobs:
           set net:reconnect-interval-max 60
           set xfer:clobber on
           set mirror:parallel-transfer-count 1
-          mirror --reverse --delete --exclude .env --exclude storage/app --exclude public/build --verbose=3 .deploy/secretaria secretaria
+          mirror --reverse --delete --exclude .env --exclude storage/app --exclude public/build --exclude vendor --verbose=3 .deploy/secretaria secretaria
+          bye
+          EOF
+
+      - name: Upload vendor to ~/secretaria/vendor
+        if: github.event.inputs.migrate_only != 'true' && (steps.changes.outputs.composer == 'true' || github.event.inputs.full_deploy == 'true')
+        timeout-minutes: 240
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" <<'EOF'
+          set cmd:fail-exit yes
+          set ftp:ssl-allow no
+          set ftp:passive-mode true
+          set net:timeout 30
+          set net:max-retries 8
+          set net:reconnect-interval-base 5
+          set net:reconnect-interval-max 60
+          set xfer:clobber on
+          set mirror:parallel-transfer-count 1
+          mirror --reverse --verbose=3 .deploy/secretaria/vendor secretaria/vendor
           bye
           EOF
 
