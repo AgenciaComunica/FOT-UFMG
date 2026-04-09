@@ -206,7 +206,7 @@ jobs:
           set net:reconnect-interval-max 60
           set xfer:clobber on
           set mirror:parallel-transfer-count 1
-          mirror --reverse --delete --verbose=3 .deploy/app public_html/app
+          mirror --reverse --delete --exclude build --verbose=3 .deploy/app public_html/app
           bye
           EOF
 
