@@ -74,18 +74,18 @@ jobs:
         run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Setup Node
-        if: github.event.inputs.migrate_only != 'true' && (steps.changes.outputs.frontend == 'true' || github.event.inputs.full_deploy == 'true')
+        if: github.event.inputs.migrate_only != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
       - name: Install frontend dependencies
-        if: github.event.inputs.migrate_only != 'true' && (steps.changes.outputs.frontend == 'true' || github.event.inputs.full_deploy == 'true')
+        if: github.event.inputs.migrate_only != 'true'
         run: npm ci
 
       - name: Build frontend assets
-        if: github.event.inputs.migrate_only != 'true' && (steps.changes.outputs.frontend == 'true' || github.event.inputs.full_deploy == 'true')
+        if: github.event.inputs.migrate_only != 'true'
         run: npm run build
 
       - name: Prepare deploy package
@@ -206,7 +206,7 @@ jobs:
           set net:reconnect-interval-max 60
           set xfer:clobber on
           set mirror:parallel-transfer-count 1
-          mirror --reverse --delete --verbose=3 .deploy/app public_html/app
+          mirror --reverse --delete --exclude build --verbose=3 .deploy/app public_html/app
           bye
           EOF
 
