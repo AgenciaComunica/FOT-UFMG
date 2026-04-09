@@ -47,6 +47,7 @@ jobs:
               - 'postcss.config.js'
               - 'resources/js/**'
               - 'resources/css/**'
+              - 'resources/views/**'
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
