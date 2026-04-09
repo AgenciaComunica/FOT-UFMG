@@ -160,7 +160,7 @@ jobs:
           set net:reconnect-interval-max 60
           set xfer:clobber on
           set mirror:parallel-transfer-count 1
-          mirror --reverse --delete --exclude .env --verbose=3 .deploy/secretaria secretaria
+          mirror --reverse --delete --exclude .env --exclude storage/app --verbose=3 .deploy/secretaria secretaria
           bye
           EOF
 
