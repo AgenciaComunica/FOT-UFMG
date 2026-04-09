@@ -62,7 +62,6 @@ jobs:
           key: ${{ runner.os }}-vendor-${{ hashFiles('composer.lock') }}
 
       - name: Install PHP dependencies (production)
-        if: steps.changes.outputs.composer == 'true' || steps.vendor-cache.outputs.cache-hit != 'true' || github.event.inputs.full_deploy == 'true'
         run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Setup Node
@@ -108,9 +107,7 @@ jobs:
 
           rsync -av --delete --exclude "build" ./public/ .deploy/app/
 
-          if [ "${{ steps.changes.outputs.composer }}" = "true" ] || [ "${{ steps.vendor-cache.outputs.cache-hit }}" != "true" ] || [ "${{ github.event.inputs.full_deploy }}" = "true" ]; then
-            rsync -av ./vendor/ .deploy/secretaria/vendor/
-          fi
+          rsync -av ./vendor/ .deploy/secretaria/vendor/
 
           if [ "${{ steps.changes.outputs.frontend }}" = "true" ] || [ "${{ github.event.inputs.full_deploy }}" = "true" ]; then
             rsync -av ./public/build/ .deploy/secretaria/public/build/
