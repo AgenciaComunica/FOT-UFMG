@@ -18,7 +18,7 @@ on:
 
 concurrency:
   group: deploy-main
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -125,27 +125,50 @@ jobs:
           echo "== Public app file count =="
           find .deploy/app -type f | wc -l
 
+      - name: Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
       - name: Upload project to ~/secretaria
-        uses: locaweb/ftp-deploy@1.0.0
-        with:
-          host: ${{ secrets.FTP_SERVER }}
-          user: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          localDir: .deploy/secretaria
-          remoteDir: secretaria
-          forceSsl: false
-          options: "--verbose"
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" <<'EOF'
+          set cmd:fail-exit yes
+          set ftp:ssl-allow no
+          set ftp:passive-mode true
+          set net:timeout 30
+          set net:max-retries 8
+          set net:reconnect-interval-base 5
+          set net:reconnect-interval-max 60
+          set xfer:clobber on
+          set mirror:parallel-transfer-count 1
+          mirror --reverse --delete --verbose=3 .deploy/secretaria secretaria
+          bye
+          EOF
 
       - name: Upload public entrypoint to ~/public_html/app
-        uses: locaweb/ftp-deploy@1.0.0
-        with:
-          host: ${{ secrets.FTP_SERVER }}
-          user: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          localDir: .deploy/app
-          remoteDir: public_html/app
-          forceSsl: false
-          options: "--verbose"
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" <<'EOF'
+          set cmd:fail-exit yes
+          set ftp:ssl-allow no
+          set ftp:passive-mode true
+          set net:timeout 30
+          set net:max-retries 8
+          set net:reconnect-interval-base 5
+          set net:reconnect-interval-max 60
+          set xfer:clobber on
+          set mirror:parallel-transfer-count 1
+          mirror --reverse --delete --verbose=3 .deploy/app public_html/app
+          bye
+          EOF
 
       - name: Run production migrations (remote DB)
         if: github.event_name == 'push' || github.event.inputs.run_migrate == 'true'
