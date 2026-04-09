@@ -116,14 +116,11 @@ jobs:
             ./ .deploy/secretaria/
 
           rsync -av --delete --exclude "build" ./public/ .deploy/app/
+          rsync -av ./public/build/ .deploy/secretaria/public/build/
+          rsync -av ./public/build/ .deploy/app/build/
 
           if [ "${{ steps.changes.outputs.composer }}" = "true" ] || [ "${{ github.event.inputs.full_deploy }}" = "true" ]; then
             rsync -av ./vendor/ .deploy/secretaria/vendor/
-          fi
-
-          if [ "${{ steps.changes.outputs.frontend }}" = "true" ] || [ "${{ github.event.inputs.full_deploy }}" = "true" ]; then
-            rsync -av ./public/build/ .deploy/secretaria/public/build/
-            rsync -av ./public/build/ .deploy/app/build/
           fi
 
       - name: Inspect deploy package
@@ -206,7 +203,7 @@ jobs:
           set net:reconnect-interval-max 60
           set xfer:clobber on
           set mirror:parallel-transfer-count 1
-          mirror --reverse --delete --exclude build --verbose=3 .deploy/app public_html/app
+          mirror --reverse --delete --verbose=3 .deploy/app public_html/app
           bye
           EOF
 
