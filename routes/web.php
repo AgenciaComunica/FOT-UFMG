@@ -82,7 +82,9 @@ Route::prefix('admin')
         Route::put('/inscricoes/{inscricao}', [AdminInscricaoController::class, 'update'])->name('inscricoes.update');
         Route::delete('/inscricoes/{inscricao}', [AdminInscricaoController::class, 'destroy'])->name('inscricoes.destroy');
         Route::post('/inscricoes/{inscricao}/status', [AdminInscricaoController::class, 'updateStatus'])->name('inscricoes.status');
+        Route::post('/inscricoes/{inscricao}/verificacao-email', [AdminInscricaoController::class, 'enviarLembreteVerificacao'])->name('inscricoes.verificacao');
         Route::post('/inscricoes/status/lote', [AdminInscricaoController::class, 'bulkUpdateStatus'])->name('inscricoes.status.bulk');
+        Route::post('/inscricoes/verificacao-email/lote', [AdminInscricaoController::class, 'bulkEnviarLembreteVerificacao'])->name('inscricoes.verificacao.bulk');
         Route::post('/inscricoes/excluir/lote', [AdminInscricaoController::class, 'bulkDestroy'])->name('inscricoes.destroy.bulk');
         Route::post('/inscricoes/{inscricao}/documentos', [AdminInscricaoController::class, 'storeDocumento'])->name('inscricoes.documentos.store');
         Route::put('/inscricoes/{inscricao}/documentos/{doc}', [AdminInscricaoController::class, 'updateDocumento'])->name('inscricoes.documentos.update');

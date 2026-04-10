@@ -6,7 +6,7 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="rangeInscricaoFilter(@js($dateStart), @js($dateEnd))">
+    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="rangeInscricaoFilter(@js($dateStart), @js($dateEnd), @js($inscricoes->map(fn ($inscricao) => ['id' => $inscricao->id, 'can_remind_verification' => ! $inscricao->email_verified_at && filled($inscricao->email) && $inscricao->edital?->isAberto()])->values()))">
         <form method="GET" x-show="showFilters" x-transition class="panel-card grid gap-3 md:grid-cols-6 md:items-end" x-ref="filterForm">
             <input type="hidden" name="per_page" value="{{ $perPage }}">
             <input type="hidden" name="data_inicio" x-model="startDate">
@@ -60,11 +60,20 @@
             </div>
         </form>
 
-        <div class="flex justify-end">
+        <div class="flex flex-wrap items-center justify-end gap-2">
             <button
                 type="button"
-                class="inline-flex h-[42px] items-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+                class="inline-flex h-[42px] items-center rounded-md bg-amber-100 px-4 text-sm font-semibold text-amber-800 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+                x-show="selectedIds.length > 0 && selectedReminderCount > 0"
+                @click="verificationReminderOpen = true"
+            >
+                Verificação de e-mail
+            </button>
+            <button
+                type="button"
+                class="inline-flex h-[42px] items-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 x-show="selectedIds.length > 0"
+                :disabled="selectedIds.length === 0"
                 @click="bulkModalOpen = true; bulkAction = 'status'; bulkStatus = 'HOMOLOGADA'"
             >
                 Aplicar em vários
@@ -94,6 +103,7 @@
                         @php
                             $statusClass = \App\Models\Inscricao::statusBadgeClass($inscricao->status);
                             $statusLabel = \App\Models\Inscricao::statusLabel($inscricao->status);
+                            $verificationSentToday = optional($inscricao->verification_sent_at)?->isToday() ?? false;
                         @endphp
                         <tr>
                             <td>
@@ -120,10 +130,32 @@
                             </td>
                             <td>{{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</td>
                             <td>
-                                <div class="flex items-center gap-2">
+                                <div class="flex justify-end gap-2 whitespace-nowrap">
+                                    @if (! $inscricao->email_verified_at && filled($inscricao->email) && $inscricao->edital?->isAberto())
+                                        <form method="POST" id="verification-inscricao-{{ $inscricao->id }}" action="{{ route('admin.inscricoes.verificacao', $inscricao) }}">
+                                            @csrf
+                                            <button
+                                                type="button"
+                                                class="inline-flex h-8 w-8 items-center justify-center rounded-md border transition {{ $verificationSentToday ? 'border-slate-300 bg-slate-100 text-slate-500 hover:bg-slate-200' : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100' }}"
+                                                title="{{ $verificationSentToday ? 'E-mail já enviado hoje' : 'Verificar e-mail' }}"
+                                                @click="verificationFormId = 'verification-inscricao-{{ $inscricao->id }}'; verificationLabel = '{{ $inscricao->protocolo }}'; verificationAlreadySentToday = {{ $verificationSentToday ? 'true' : 'false' }}; verificationConfirmOpen = true"
+                                            >
+                                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                    <path d="M4 6h16v12H4z" />
+                                                    <path d="m4 8 8 6 8-6" />
+                                                </svg>
+                                                <span class="sr-only">Verificar E-mail</span>
+                                            </button>
+                                        </form>
+                                    @endif
                                     <a href="{{ route('admin.inscricoes.show', $inscricao) }}"
-                                       class="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
-                                        Ver
+                                       class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-blue-700 transition hover:bg-blue-100"
+                                       title="Ver">
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                                            <circle cx="12" cy="12" r="3" />
+                                        </svg>
+                                        <span class="sr-only">Ver</span>
                                     </a>
                                     <form method="POST" id="delete-inscricao-{{ $inscricao->id }}" action="{{ route('admin.inscricoes.destroy', $inscricao) }}" class="hidden">
                                         @csrf
@@ -131,10 +163,18 @@
                                     </form>
                                     <button
                                         type="button"
-                                        class="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                                        class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 transition hover:bg-red-100"
+                                        title="Excluir"
                                         @click="singleDeleteFormId = 'delete-inscricao-{{ $inscricao->id }}'; singleDeleteLabel = '{{ $inscricao->protocolo }}'; confirmSingleDeleteOpen = true"
                                     >
-                                        Excluir
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M3 6h18" />
+                                            <path d="M8 6V4h8v2" />
+                                            <path d="M19 6l-1 14H6L5 6" />
+                                            <path d="M10 11v6" />
+                                            <path d="M14 11v6" />
+                                        </svg>
+                                        <span class="sr-only">Excluir</span>
                                     </button>
                                 </div>
                             </td>
@@ -149,7 +189,7 @@
         </div>
 
         <div x-show="bulkModalOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="bulkModalOpen=false">
-            <div class="w-full max-w-3xl rounded-xl bg-white p-4 shadow-lg">
+            <div class="w-full max-w-5xl rounded-xl bg-white p-5 shadow-lg">
                     <h3 class="text-lg font-bold text-slate-900">Ação para vários</h3>
                     <form x-show="bulkAction === 'status'" method="POST" action="{{ route('admin.inscricoes.status.bulk') }}" class="mt-4 space-y-3">
                         @csrf
@@ -162,19 +202,19 @@
                         <input type="hidden" name="selected_ids[]" :value="id">
                     </template>
                     <div class="grid gap-3 md:grid-cols-3">
-                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 md:col-span-2">
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-5 md:col-span-2">
                             <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Controle de Inscrição</p>
-                            <div class="flex items-center justify-center gap-2 py-1">
-                                <button type="button" class="btn-success whitespace-nowrap" @click="bulkStatus='HOMOLOGADA'">Homologar</button>
-                                <button type="button" class="rounded-md bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700 whitespace-nowrap" @click="bulkStatus='PRE_APROVADA'">Classificar</button>
-                                <button type="button" class="rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 whitespace-nowrap" @click="bulkStatus='PRE_INDEFERIDA'">Excedente</button>
-                                <button type="button" class="btn-muted whitespace-nowrap" @click="bulkStatus='HOMOLOGADA'">Voltar à Análise</button>
-                                <button type="button" class="btn-danger whitespace-nowrap" @click="bulkStatus='INDEFERIDA'">Não homologar</button>
+                            <div class="grid grid-cols-1 gap-2 py-2 sm:grid-cols-2 xl:grid-cols-5">
+                                <button type="button" class="btn-success justify-center whitespace-nowrap" @click="bulkStatus='HOMOLOGADA'">Homologar</button>
+                                <button type="button" class="inline-flex items-center justify-center rounded-md bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700 whitespace-nowrap" @click="bulkStatus='PRE_APROVADA'">Classificar</button>
+                                <button type="button" class="inline-flex items-center justify-center rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 whitespace-nowrap" @click="bulkStatus='PRE_INDEFERIDA'">Excedente</button>
+                                <button type="button" class="btn-muted justify-center whitespace-nowrap" @click="bulkStatus='RECEBIDA'">Voltar à Análise</button>
+                                <button type="button" class="btn-danger justify-center whitespace-nowrap" @click="bulkStatus='INDEFERIDA'">Não homologar</button>
                             </div>
                         </div>
-                        <div class="rounded-lg border border-red-200 bg-red-50 p-4 md:col-span-1">
+                        <div class="rounded-lg border border-red-200 bg-red-50 p-5 md:col-span-1">
                             <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-red-700">Exclusão de Inscrição</p>
-                            <div class="flex items-center justify-center gap-2 py-1">
+                            <div class="flex min-h-[56px] items-center justify-center py-2">
                                 <button type="button" class="btn-danger whitespace-nowrap" @click="bulkAction='delete'">Excluir</button>
                             </div>
                         </div>
@@ -209,6 +249,38 @@
                     <div class="flex justify-end gap-2 pt-2">
                         <button type="button" class="btn-muted" @click="bulkAction='status'">Voltar</button>
                         <button type="submit" class="btn-danger">Excluir selecionadas</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div x-show="verificationReminderOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="verificationReminderOpen=false">
+            <div class="w-full max-w-xl rounded-xl bg-white p-5 shadow-lg">
+                <h3 class="text-lg font-bold text-slate-900">Lembrete de Verificação de e-mail</h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    Será disparado
+                    <span class="font-semibold text-slate-900" x-text="selectedReminderCount"></span>
+                    e-mail(s) de verificação para os usuários que ainda não verificaram o e-mail.
+                </p>
+                <p class="mt-2 text-sm text-slate-600">
+                    O envio considera apenas as inscrições selecionadas que ainda não verificaram o e-mail e pertencem a editais abertos.
+                </p>
+
+                <form method="POST" action="{{ route('admin.inscricoes.verificacao.bulk') }}" class="mt-4 space-y-4">
+                    @csrf
+                    <template x-for="id in selectedRemindableIds" :key="`remind-${id}`">
+                        <input type="hidden" name="selected_ids[]" :value="id">
+                    </template>
+
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                        Apenas inscrições selecionadas, com e-mail não verificado e vinculadas a editais abertos receberão o lembrete.
+                    </div>
+
+                    <div class="flex justify-end gap-2">
+                        <button type="button" class="btn-muted" @click="verificationReminderOpen=false">Cancelar</button>
+                        <button type="submit" class="inline-flex items-center rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60" :disabled="selectedReminderCount === 0">
+                            Disparar lembrete
+                        </button>
                     </div>
                 </form>
             </div>
@@ -264,25 +336,60 @@
                 </div>
             </div>
         </div>
+
+        <div x-show="verificationConfirmOpen" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" style="display:none;" @click.self="verificationConfirmOpen=false">
+            <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+                <h3 class="text-lg font-bold text-slate-900">Confirmar envio de e-mail</h3>
+                <p class="mt-2 text-sm text-slate-600" x-show="!verificationAlreadySentToday">
+                    Será disparado um e-mail de verificação para a inscrição
+                    <span class="font-semibold text-slate-800" x-text="verificationLabel"></span>.
+                </p>
+                <p class="mt-2 text-sm text-slate-600" x-show="verificationAlreadySentToday">
+                    Já foi enviado um e-mail de verificação hoje para a inscrição
+                    <span class="font-semibold text-slate-800" x-text="verificationLabel"></span>.
+                    Deseja disparar outro?
+                </p>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button type="button" class="btn-muted" @click="verificationConfirmOpen=false">Cancelar</button>
+                    <button type="button" class="inline-flex items-center rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600" @click="submitVerificationReminder()">Disparar e-mail</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
     <script>
-        function rangeInscricaoFilter(initialStart, initialEnd) {
+        function rangeInscricaoFilter(initialStart, initialEnd, reminderItems) {
             return {
                 showFilters: true,
                 timer: null,
                 selectedIds: [],
+                reminderItems: reminderItems || [],
                 bulkModalOpen: false,
+                verificationReminderOpen: false,
                 bulkAction: 'status',
                 bulkStatus: 'HOMOLOGADA',
                 confirmSingleDeleteOpen: false,
+                verificationConfirmOpen: false,
                 singleDeleteFormId: '',
                 singleDeleteLabel: '',
+                verificationFormId: '',
+                verificationLabel: '',
+                verificationAlreadySentToday: false,
                 startDate: initialStart || '',
                 endDate: initialEnd || '',
+                get selectedRemindableIds() {
+                    const eligibleIds = this.reminderItems
+                        .filter((item) => item.can_remind_verification)
+                        .map((item) => item.id);
+
+                    return this.selectedIds.filter((id) => eligibleIds.includes(id));
+                },
+                get selectedReminderCount() {
+                    return this.selectedRemindableIds.length;
+                },
                 toggleOne(id, checked) {
                     if (checked) {
                         if (!this.selectedIds.includes(id)) this.selectedIds.push(id);
@@ -301,6 +408,11 @@
                 submitSingleDelete() {
                     if (!this.singleDeleteFormId) return;
                     const form = document.getElementById(this.singleDeleteFormId);
+                    if (form) form.submit();
+                },
+                submitVerificationReminder() {
+                    if (!this.verificationFormId) return;
+                    const form = document.getElementById(this.verificationFormId);
                     if (form) form.submit();
                 },
                 init() {
