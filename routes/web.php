@@ -21,13 +21,13 @@ Route::post('/newsletter', [PublicLeadController::class, 'store'])
     ->middleware('throttle:8,60')
     ->name('public.leads.store');
 Route::post('/inscricoes/verificar', [PublicPortalController::class, 'verificarInscricao'])
-    ->middleware('throttle:8,1')
+    ->middleware('throttle:public-inscricoes-verificar')
     ->name('public.inscricoes.verificar');
 Route::post('/inscricoes/{inscricao}/enviar-informacoes', [PublicPortalController::class, 'enviarInformacoesCompletas'])
-    ->middleware('throttle:4,1')
+    ->middleware('throttle:public-inscricao-enviar-informacoes')
     ->name('public.inscricoes.enviar-informacoes');
 Route::post('/inscricoes/{inscricao}/enviar-link-edicao', [PublicPortalController::class, 'enviarLinkEdicao'])
-    ->middleware('throttle:4,1')
+    ->middleware('throttle:public-inscricao-enviar-link-edicao')
     ->name('public.inscricoes.enviar-link-edicao');
 
 Route::get('/editais/{edital}/inscricao', [PublicInscricaoController::class, 'create'])->name('public.inscricao.create');
@@ -42,7 +42,7 @@ Route::get('/inscricoes/{inscricao}/aviso-verificacao', [PublicInscricaoControll
 Route::get('/inscricoes/{inscricao}/verificar-email/{token}', [PublicInscricaoController::class, 'verificarEmail'])
     ->name('public.inscricao.email.verificar');
 Route::post('/inscricoes/{inscricao}/reenviar-verificacao', [PublicInscricaoController::class, 'reenviarVerificacao'])
-    ->middleware('throttle:4,1')
+    ->middleware('throttle:public-inscricao-reenviar-verificacao')
     ->name('public.inscricao.email.reenviar');
 Route::get('/inscricoes/{inscricao}/editar/{token}', [PublicInscricaoController::class, 'editWithToken'])
     ->name('public.inscricoes.editar');
