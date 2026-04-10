@@ -306,9 +306,12 @@
     width: 100%; height: 100%;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 16px;
-    background: linear-gradient(135deg, #163f73 0%, #2565aa 100%);
+    background:
+      linear-gradient(135deg, rgba(10, 27, 46, 0.42), rgba(37,101,170,0.18)),
+      center / cover no-repeat;
     color: rgba(255,255,255,0.5);
     font-size: 0.9rem;
+    cursor: pointer;
   }
   .play-icon {
     width: 68px; height: 68px;
@@ -773,16 +776,18 @@
     para fisioterapeutas que querem elevar sua prática clínica ao mais alto padrão.
   </p>
 
-  <!-- VIDEO (substitua o src pelo link real do vídeo do Prof. Renan) -->
   <div class="video-wrapper">
-    <!-- 
-      OPÇÃO 1 — YouTube embed:
-      <iframe src="https://www.youtube.com/embed/SEU_VIDEO_ID?autoplay=1&mute=1" frameborder="0" allowfullscreen allow="autoplay"></iframe>
-      
-      OPÇÃO 2 — Vídeo direto:
-      <video src="URL_DO_VIDEO.mp4" autoplay muted loop playsinline></video>
-    -->
-    <div class="video-placeholder">
+    <div
+      class="video-placeholder"
+      data-video-placeholder
+      data-video-embed="https://www.youtube.com/embed/7cX7seLZw6g?autoplay=1&rel=0"
+      style="background-image:
+        linear-gradient(135deg, rgba(10, 27, 46, 0.42), rgba(37,101,170,0.18)),
+        url('https://i.ytimg.com/vi/7cX7seLZw6g/maxresdefault.jpg');"
+      role="button"
+      tabindex="0"
+      aria-label="Assistir vídeo de apresentação do curso"
+    >
       <div class="play-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
       </div>
@@ -1061,6 +1066,34 @@
     if (event.key === 'Escape') {
       closeMenu();
     }
+  });
+
+  document.querySelectorAll('[data-video-placeholder]').forEach(placeholder => {
+    const embedUrl = placeholder.dataset.videoEmbed;
+    if (!embedUrl) return;
+
+    const mountVideo = () => {
+      if (placeholder.dataset.loaded === 'true') return;
+      placeholder.dataset.loaded = 'true';
+
+      const iframe = document.createElement('iframe');
+      iframe.src = embedUrl;
+      iframe.title = 'Vídeo de apresentação do curso';
+      iframe.loading = 'lazy';
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+      iframe.allowFullscreen = true;
+      iframe.frameBorder = '0';
+
+      placeholder.replaceWith(iframe);
+    };
+
+    placeholder.addEventListener('click', mountVideo);
+    placeholder.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        mountVideo();
+      }
+    });
   });
 </script>
 </body>
