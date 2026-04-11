@@ -134,39 +134,41 @@
                     </div>
                 </div>
 
-                <div class="rounded-xl border border-slate-200 p-4">
-                    <div class="mb-3 flex items-center justify-between gap-3">
-                        <h3 class="text-sm font-semibold text-slate-800">Arquivos enviados</h3>
-                        <div class="flex items-center gap-3">
-                            <span class="text-xs text-slate-500">Use editar para substituir ou excluir arquivo</span>
-                            <button type="button" class="btn-primary !px-3 !py-1.5 !text-xs" @click="openDocCreate()">Adicionar documento</button>
+                @if (! $inscricao->edital?->isArquivado())
+                    <div class="rounded-xl border border-slate-200 p-4">
+                        <div class="mb-3 flex items-center justify-between gap-3">
+                            <h3 class="text-sm font-semibold text-slate-800">Arquivos enviados</h3>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs text-slate-500">Use editar para substituir ou excluir arquivo</span>
+                                <button type="button" class="btn-primary !px-3 !py-1.5 !text-xs" @click="openDocCreate()">Adicionar documento</button>
+                            </div>
                         </div>
+                        <ul class="mt-2 space-y-2">
+                            @forelse ($inscricao->documentos as $doc)
+                                <li class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 text-sm">
+                                    <span>{{ $doc->tipo }} ({{ $doc->original_name }})</span>
+                                    <div class="flex items-center gap-2">
+                                        <a href="{{ route('admin.inscricoes.documentos.download', [$inscricao, $doc]) }}" class="text-blue-600 hover:underline">Download</a>
+                                        <button type="button"
+                                                class="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                                                @click="openDocModal({{ $doc->id }}, @js($doc->tipo), @js($doc->original_name))">
+                                            Editar
+                                        </button>
+                                        <button type="button"
+                                                class="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                                                @click="openDocDelete({{ $doc->id }}, @js($doc->tipo), @js($doc->original_name))">
+                                            Excluir
+                                        </button>
+                                    </div>
+                                </li>
+                            @empty
+                                <li class="rounded-lg border border-dashed border-slate-300 p-3 text-sm text-slate-500">
+                                    Nenhum documento enviado.
+                                </li>
+                            @endforelse
+                        </ul>
                     </div>
-                    <ul class="mt-2 space-y-2">
-                        @forelse ($inscricao->documentos as $doc)
-                            <li class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 text-sm">
-                                <span>{{ $doc->tipo }} ({{ $doc->original_name }})</span>
-                                <div class="flex items-center gap-2">
-                                    <a href="{{ route('admin.inscricoes.documentos.download', [$inscricao, $doc]) }}" class="text-blue-600 hover:underline">Download</a>
-                                    <button type="button"
-                                            class="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-                                            @click="openDocModal({{ $doc->id }}, @js($doc->tipo), @js($doc->original_name))">
-                                        Editar
-                                    </button>
-                                    <button type="button"
-                                            class="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
-                                            @click="openDocDelete({{ $doc->id }}, @js($doc->tipo), @js($doc->original_name))">
-                                        Excluir
-                                    </button>
-                                </div>
-                            </li>
-                        @empty
-                            <li class="rounded-lg border border-dashed border-slate-300 p-3 text-sm text-slate-500">
-                                Nenhum documento enviado.
-                            </li>
-                        @endforelse
-                    </ul>
-                </div>
+                @endif
             </div>
 
             <div x-show="tab === 'avaliacoes'" x-transition class="space-y-4">
