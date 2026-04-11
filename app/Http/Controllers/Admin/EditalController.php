@@ -602,6 +602,45 @@ class EditalController extends Controller
         return back()->with('status', 'Edital arquivado com sucesso. Os arquivos enviados pelos candidatos foram removidos do disco e os metadados foram preservados.');
     }
 
+    public function downloadDocumentos(Edital $edital): StreamedResponse
+    {
+        abort_if($edital->isArquivado(), 404);
+
+        $edital->loadMissing('inscricoes.documentos');
+
+        $zipName = 'edital-'.preg_replace('/[^a-z0-9]+/i', '-', $edital->titulo).'.zip';
+        $tempPath = tempnam(sys_get_temp_dir(), 'edital_zip_');
+
+        $zip = new \ZipArchive();
+        $zip->open($tempPath, \ZipArchive::OVERWRITE);
+
+        if (filled($edital->arquivo_path) && Storage::disk('local')->exists($edital->arquivo_path)) {
+            $zip->addFile(
+                Storage::disk('local')->path($edital->arquivo_path),
+                'edital/'.basename($edital->arquivo_path)
+            );
+        }
+
+        foreach ($edital->inscricoes as $inscricao) {
+            $pasta = preg_replace('/[^a-z0-9]+/i', '-', $inscricao->nome_completo).'-'.substr($inscricao->id, 0, 8);
+            foreach ($inscricao->documentos as $doc) {
+                if (filled($doc->arquivo_path) && Storage::disk('local')->exists($doc->arquivo_path)) {
+                    $zip->addFile(
+                        Storage::disk('local')->path($doc->arquivo_path),
+                        'inscricoes/'.$pasta.'/'.($doc->original_name ?: basename($doc->arquivo_path))
+                    );
+                }
+            }
+        }
+
+        $zip->close();
+
+        return response()->streamDownload(function () use ($tempPath) {
+            readfile($tempPath);
+            @unlink($tempPath);
+        }, $zipName, ['Content-Type' => 'application/zip']);
+    }
+
     public function downloadArquivo(Edital $edital): StreamedResponse
     {
         abort_unless($edital->arquivo_path && Storage::disk('local')->exists($edital->arquivo_path), 404);

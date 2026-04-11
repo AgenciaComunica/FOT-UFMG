@@ -380,14 +380,46 @@
         >
             <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
                 <h4 class="text-base font-semibold text-slate-900">Arquivar edital</h4>
-                <p class="mt-2 text-sm text-slate-600">Este edital será arquivado. Os documentos enviados pelos candidatos serão removidos do disco para liberar espaço, mantendo os metadados das inscrições.</p>
+                <p class="mt-2 text-sm text-slate-600">Os documentos dos candidatos serão removidos do disco ao arquivar. <strong>Baixe o ZIP antes de confirmar.</strong></p>
                 <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                     <p><span class="font-semibold">Edital:</span> <span x-text="archiveTitle"></span></p>
                     <p class="mt-1"><span class="font-semibold">Inscrições vinculadas:</span> <span x-text="archiveInscricoesCount"></span></p>
                 </div>
+
+                {{-- Passo 1: baixar documentos --}}
+                <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Passo 1 — Baixar documentos</p>
+                    <a
+                        :href="archiveId ? '{{ url('admin/editais') }}/' + archiveId + '/download-documentos' : '#'"
+                        target="_blank"
+                        @click="archiveDownloadDone = true"
+                        class="mt-2 inline-flex items-center gap-2 rounded-md border border-blue-300 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                        Baixar documentos (.zip)
+                    </a>
+                    <p x-show="archiveDownloadDone" class="mt-2 text-xs text-green-700 font-medium">✓ Download iniciado. Confirme o arquivamento abaixo.</p>
+                </div>
+
+                {{-- Passo 2: confirmar arquivamento --}}
+                <div class="mt-3 rounded-lg border p-3" :class="archiveDownloadDone ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50 opacity-50'">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Passo 2 — Confirmar arquivamento</p>
+                    <p class="mt-1 text-xs text-slate-500">Esta ação é irreversível. Os arquivos serão deletados do servidor.</p>
+                </div>
+
                 <div class="mt-4 flex justify-end gap-2">
                     <button type="button" @click="closeArchiveModal()" class="btn-muted">Cancelar</button>
-                    <button type="button" @click="confirmArchive()" class="inline-flex items-center rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700">Arquivar</button>
+                    <button
+                        type="button"
+                        @click="confirmArchive()"
+                        :disabled="!archiveDownloadDone"
+                        :class="archiveDownloadDone ? 'bg-red-600 hover:bg-red-700 cursor-pointer' : 'bg-slate-300 cursor-not-allowed'"
+                        class="inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-white transition"
+                    >
+                        Confirmar arquivamento
+                    </button>
                 </div>
             </div>
         </div>
@@ -456,6 +488,7 @@
                 archiveId: null,
                 archiveTitle: '',
                 archiveInscricoesCount: 0,
+                archiveDownloadDone: false,
                 openCreateBlockedModal() {
                     this.createBlockedOpen = true;
                 },
@@ -494,6 +527,7 @@
                     this.archiveId = null;
                     this.archiveTitle = '';
                     this.archiveInscricoesCount = 0;
+                    this.archiveDownloadDone = false;
                 },
                 confirmDelete() {
                     if (this.typedName.trim() !== this.expectedName.trim() || !this.editalId) {
