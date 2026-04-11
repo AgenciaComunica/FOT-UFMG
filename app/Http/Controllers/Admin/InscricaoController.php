@@ -734,6 +734,80 @@ class InscricaoController extends Controller
         return back()->with('status', "Inscrição(ões) excluída(s): {$deleted}.");
     }
 
+    public function bulkEnviarLembreteVerificacao(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'selected_ids' => ['nullable', 'array'],
+            'selected_ids.*' => ['integer', 'exists:inscricoes,id'],
+        ]);
+
+        $ids = collect($validated['selected_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+        if ($ids->isEmpty()) {
+            throw ValidationException::withMessages([
+                'selected_ids' => 'Selecione ao menos uma inscrição para enviar o lembrete de verificação.',
+            ]);
+        }
+
+        $inscricoes = Inscricao::query()
+            ->whereIn('id', $ids)
+            ->whereNull('email_verified_at')
+            ->whereNotNull('email')
+            ->with('edital')
+            ->get()
+            ->filter(fn (Inscricao $inscricao) => $this->canReceiveVerificationReminder($inscricao))
+            ->unique('id')
+            ->values();
+
+        if ($inscricoes->isEmpty()) {
+            return back()->with('status', 'Nenhuma inscrição elegível para lembrete de verificação de e-mail.');
+        }
+
+        $sent = 0;
+        $failed = 0;
+
+        foreach ($inscricoes as $inscricao) {
+            $inscricao->forceFill([
+                'email_verification_token' => hash('sha256', Str::uuid().'|'.$inscricao->email),
+                'verification_sent_at' => now(),
+            ])->save();
+
+            if ($this->enviarVerificacaoInscricao($inscricao->fresh('edital'))) {
+                $sent++;
+                continue;
+            }
+
+            $failed++;
+        }
+
+        $message = "{$sent} lembrete(s) de verificação enviados com sucesso.";
+        if ($failed > 0) {
+            $message .= " {$failed} envio(s) não puderam ser concluídos.";
+        }
+
+        return back()->with('status', $message);
+    }
+
+    public function enviarLembreteVerificacao(Inscricao $inscricao): RedirectResponse
+    {
+        $this->authorize('view', $inscricao);
+        $inscricao->loadMissing('edital');
+
+        if (! $this->canReceiveVerificationReminder($inscricao)) {
+            return back()->with('status', 'Esta inscrição não está elegível para lembrete de verificação de e-mail.');
+        }
+
+        $inscricao->forceFill([
+            'email_verification_token' => hash('sha256', Str::uuid().'|'.$inscricao->email),
+            'verification_sent_at' => now(),
+        ])->save();
+
+        if (! $this->enviarVerificacaoInscricao($inscricao->fresh('edital'))) {
+            return back()->with('status', 'Não foi possível enviar o lembrete de verificação agora.');
+        }
+
+        return back()->with('status', 'Lembrete de verificação enviado com sucesso.');
+    }
+
     public function indeferir(AdminIndeferirInscricaoRequest $request, Inscricao $inscricao): RedirectResponse
     {
         DB::transaction(function () use ($request, $inscricao): void {
@@ -820,10 +894,20 @@ class InscricaoController extends Controller
         return $this->workflowService->statusPublico($status);
     }
 
-    private function enviarVerificacaoInscricao(Inscricao $inscricao): void
+    private function canReceiveVerificationReminder(Inscricao $inscricao): bool
+    {
+        $inscricao->loadMissing('edital');
+
+        return ! $inscricao->isEmailVerified()
+            && filled($inscricao->email)
+            && $inscricao->edital?->isAberto()
+            && ! $inscricao->edital?->isArquivado();
+    }
+
+    private function enviarVerificacaoInscricao(Inscricao $inscricao): bool
     {
         if (! filled($inscricao->email) || ! filled($inscricao->email_verification_token)) {
-            return;
+            return false;
         }
 
         $verificationUrl = route('public.inscricao.email.verificar', [
@@ -836,6 +920,7 @@ class InscricaoController extends Controller
             Mail::to($inscricao->email)->send(
                 new InscricaoRecebidaMail($inscricao, $verificationUrl, $statusUrl)
             );
+            return true;
         } catch (\Throwable $e) {
             Log::error('Falha ao enviar e-mail de verificação da inscrição (admin).', [
                 'inscricao_id' => $inscricao->id,
@@ -843,6 +928,8 @@ class InscricaoController extends Controller
                 'email' => $inscricao->email,
                 'exception' => $e->getMessage(),
             ]);
+
+            return false;
         }
     }
 
