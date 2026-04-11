@@ -76,6 +76,7 @@ Route::prefix('admin')
         Route::post('docentes/{docente}/status', [AdminDocenteController::class, 'updateStatus'])->name('docentes.status');
         Route::post('editais/{edital}/publicacao', [AdminEditalController::class, 'updatePublicacao'])->name('editais.publicacao');
         Route::post('editais/{edital}/arquivar', [AdminEditalController::class, 'archive'])->name('editais.archive');
+        Route::get('editais/{edital}/download-documentos', [AdminEditalController::class, 'downloadDocumentos'])->name('editais.download-documentos');
 
         Route::get('/editais/{edital}/inscricoes', [AdminInscricaoController::class, 'byEdital'])->name('editais.inscricoes.index');
         Route::get('/inscricoes/{inscricao}', [AdminInscricaoController::class, 'show'])->name('inscricoes.show');
