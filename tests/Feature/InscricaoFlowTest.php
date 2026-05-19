@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Mail\InscricaoRecebidaMail;
 use App\Models\Edital;
 use App\Models\Inscricao;
 use App\Models\InscricaoDocumento;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -179,6 +181,41 @@ class InscricaoFlowTest extends TestCase
         $csv->assertOk();
         $csv->assertHeader('content-type', 'text/csv; charset=UTF-8');
         $this->assertStringContainsString($inscricao->protocolo, $csv->streamedContent());
+    }
+
+    public function test_admin_pode_enviar_verificacao_de_email_com_edital_encerrado(): void
+    {
+        Mail::fake();
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $edital = Edital::factory()->create([
+            'periodo_inscricao_inicio' => now()->subDays(10),
+            'periodo_inscricao_fim' => now()->subDay(),
+        ]);
+
+        $inscricao = Inscricao::factory()->create([
+            'edital_id' => $edital->id,
+            'email' => 'pendente@example.com',
+            'email_verified_at' => null,
+            'status' => Inscricao::STATUS_RECEBIDA,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.inscricoes.index'))
+            ->assertOk()
+            ->assertSee('verification-inscricao-'.$inscricao->id, false);
+
+        $response = $this->actingAs($admin)
+            ->post(route('admin.inscricoes.verificacao', $inscricao));
+
+        $response->assertRedirect();
+        $response->assertSessionHas('status', 'Lembrete de verificação enviado com sucesso.');
+
+        $inscricao->refresh();
+
+        $this->assertNotNull($inscricao->email_verification_token);
+        $this->assertNotNull($inscricao->verification_sent_at);
+        Mail::assertSent(InscricaoRecebidaMail::class, fn ($mail) => $mail->hasTo('pendente@example.com'));
     }
 
     private function createEditalAberto(): Edital

@@ -6,7 +6,7 @@
         </div>
     </x-slot>
 
-    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="rangeInscricaoFilter(@js($dateStart), @js($dateEnd), @js($inscricoes->map(fn ($inscricao) => ['id' => $inscricao->id, 'can_remind_verification' => ! $inscricao->email_verified_at && filled($inscricao->email) && $inscricao->edital?->isAberto()])->values()))">
+    <div class="mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8" x-data="rangeInscricaoFilter(@js($dateStart), @js($dateEnd), @js($inscricoes->map(fn ($inscricao) => ['id' => $inscricao->id, 'can_remind_verification' => ! $inscricao->email_verified_at && filled($inscricao->email) && $inscricao->edital && ! $inscricao->edital->isArquivado()])->values()))">
         <form method="GET" x-show="showFilters" x-transition class="panel-card grid gap-3 md:grid-cols-6 md:items-end" x-ref="filterForm">
             <input type="hidden" name="per_page" value="{{ $perPage }}">
             <input type="hidden" name="data_inicio" x-model="startDate">
@@ -131,7 +131,7 @@
                             <td>{{ optional($inscricao->submitted_at)->format('d/m/Y H:i') }}</td>
                             <td>
                                 <div class="flex justify-end gap-2 whitespace-nowrap">
-                                    @if (! $inscricao->email_verified_at && filled($inscricao->email) && $inscricao->edital?->isAberto())
+                                    @if (! $inscricao->email_verified_at && filled($inscricao->email) && $inscricao->edital && ! $inscricao->edital->isArquivado())
                                         <form method="POST" id="verification-inscricao-{{ $inscricao->id }}" action="{{ route('admin.inscricoes.verificacao', $inscricao) }}">
                                             @csrf
                                             <button
@@ -263,7 +263,7 @@
                     e-mail(s) de verificação para os usuários que ainda não verificaram o e-mail.
                 </p>
                 <p class="mt-2 text-sm text-slate-600">
-                    O envio considera apenas as inscrições selecionadas que ainda não verificaram o e-mail e pertencem a editais abertos.
+                    O envio considera apenas as inscrições selecionadas que ainda não verificaram o e-mail e pertencem a editais não arquivados.
                 </p>
 
                 <form method="POST" action="{{ route('admin.inscricoes.verificacao.bulk') }}" class="mt-4 space-y-4">
@@ -273,7 +273,7 @@
                     </template>
 
                     <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                        Apenas inscrições selecionadas, com e-mail não verificado e vinculadas a editais abertos receberão o lembrete.
+                        Apenas inscrições selecionadas, com e-mail não verificado e vinculadas a editais não arquivados receberão o lembrete.
                     </div>
 
                     <div class="flex justify-end gap-2">

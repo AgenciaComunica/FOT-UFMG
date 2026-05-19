@@ -31,9 +31,7 @@ class InscricaoController extends Controller
     public function __construct(
         private readonly InscricaoPreClassificacaoService $preClassificacaoService,
         private readonly InscricaoWorkflowService $workflowService,
-    )
-    {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -773,6 +771,7 @@ class InscricaoController extends Controller
 
             if ($this->enviarVerificacaoInscricao($inscricao->fresh('edital'))) {
                 $sent++;
+
                 continue;
             }
 
@@ -900,8 +899,8 @@ class InscricaoController extends Controller
 
         return ! $inscricao->isEmailVerified()
             && filled($inscricao->email)
-            && $inscricao->edital?->isAberto()
-            && ! $inscricao->edital?->isArquivado();
+            && $inscricao->edital
+            && ! $inscricao->edital->isArquivado();
     }
 
     private function enviarVerificacaoInscricao(Inscricao $inscricao): bool
@@ -920,6 +919,7 @@ class InscricaoController extends Controller
             Mail::to($inscricao->email)->send(
                 new InscricaoRecebidaMail($inscricao, $verificationUrl, $statusUrl)
             );
+
             return true;
         } catch (\Throwable $e) {
             Log::error('Falha ao enviar e-mail de verificação da inscrição (admin).', [
